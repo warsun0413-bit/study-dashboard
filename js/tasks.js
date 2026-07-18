@@ -92,6 +92,16 @@ function readDailyPlans() {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+function rollCurrentDetailedPlanWindow() {
+  const today = getDateKey();
+  const plans = readDailyPlans();
+  const templates = readJson(planPhaseTemplatesKey, []);
+  const rolled = migrateDetailedPlanWindow(plans, Array.isArray(templates) ? templates : [], today);
+  if (JSON.stringify(rolled.dailyPlans) !== JSON.stringify(plans)) writeJson(dailyPlansKey, rolled.dailyPlans);
+  writeJson(planWindowStateKey, makePlanWindowState(today));
+  return rolled;
+}
+
 function createInitialTodayPlan(date = new Date()) {
   const isSunday = date.getDay() === 0;
   return { template: isSunday ? "sunday" : "weekday", tasks: isSunday ? createSundayTasks() : createWeekdayTasks(date), currentTaskId: "" };

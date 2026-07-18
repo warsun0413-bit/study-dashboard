@@ -42,6 +42,7 @@ function isPlainObject(value) {
 const NANKAI_PLAN_TYPE = "nankai-marxism-exam-plan";
 const NANKAI_PLAN_SCHEMA_VERSION = 2;
 const NANKAI_PLAN_REQUIRED_TASKS = ["722", "844", "english", "politics", "outputOrMock", "originalTextOrReview", "training"];
+let pendingPlanImport = null;
 
 function looksLikeStudyPlan(value) {
   return isPlainObject(value) && (
@@ -91,45 +92,122 @@ function getNextDateKey(dateKey) {
 }
 
 function importNankaiPlanV2(plan) {
-  const entries = validateNankaiPlanV2(plan);
+  validateNankaiPlanV2(plan);
   const today = getDateKey();
   const existingPlans = readDailyPlans();
-  const repeatedImport = Object.values(existingPlans).some((day) => day && day.sourcePlanType === NANKAI_PLAN_TYPE && day.sourceSchemaVersion === NANKAI_PLAN_SCHEMA_VERSION);
-  const firstAllowedDate = repeatedImport ? getNextDateKey(today) : today;
-  const eligibleEntries = entries.filter(([dateKey]) => dateKey >= firstAllowedDate);
-  if (!eligibleEntries.length) throw new Error(repeatedImport ? "计划中没有可更新的未来日期。" : "计划中没有今天及未来日期。");
+  const preview = buildPlanImportPreview(plan, existingPlans, today);
+  pendingPlanImport = { plan, today, existingPlansJson: JSON.stringify(existingPlans), preview };
+  renderPlanImportPreview(preview);
+  setStatus("#backupStatus", "计划已校验，尚未写入。请先核对差异预览。 ");
+}
 
-  const scopeLabel = repeatedImport ? "未来" : "今天及未来";
-  const confirmed = window.confirm(`已识别新版南开马理论考研计划，共 ${eligibleEntries.length} 天。此次只更新${scopeLabel}计划，不改历史记录、完成状态或专注数据。是否继续？`);
-  if (!confirmed) {
-    setStatus("#backupStatus", "已取消新版计划导入。");
+function getPlanImportDecisionLabels() {
+  return { "keep-local": "保留本地", "use-import": "采用导入", "fill-empty": "仅填充空字段", skip: "跳过" };
+}
+
+function renderPlanImportPreview(preview) {
+  const dialog = document.querySelector("#planImportPreviewDialog");
+  const summary = document.querySelector("#planImportPreviewSummary");
+  const conflicts = document.querySelector("#planImportConflicts");
+  const labels = getPlanImportDecisionLabels();
+  summary.innerHTML = "";
+  [
+    ["详细计划窗口", `${preview.window.windowStart} 至 ${preview.window.windowEnd}`],
+    ["新增日期", preview.newDates.length],
+    ["新增任务", preview.newTasks.length],
+    ["更新任务", preview.updatedTasks.length],
+    ["跳过历史日期", preview.skippedHistoryDates.length],
+    ["远期日期转阶段模板", preview.farDatesConverted.length],
+    ["已完成冲突", preview.completedConflicts.length],
+    ["进行中冲突", preview.inProgressConflicts.length],
+    ["人工编辑冲突", preview.manualEditedConflicts.length],
+    ["无法稳定匹配", preview.unmatchedConflicts.length],
+    ["保留自定义任务", preview.customTasks.length],
+    ["保留本地值", preview.keepLocal.length],
+    ["采用导入值", preview.useImport.length],
+    ["生成阶段模板", preview.phaseTemplates.length],
+  ].forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    summary.appendChild(row);
+  });
+  conflicts.innerHTML = "";
+  if (!preview.conflicts.length) {
+    conflicts.innerHTML = '<p class="muted">没有需要人工选择的受保护任务冲突。</p>';
+  } else {
+    preview.conflicts.forEach((conflict) => {
+      const row = document.createElement("label");
+      row.className = "plan-import-conflict";
+      const text = document.createElement("span");
+      text.textContent = `${conflict.date}｜${conflict.localTask.name || conflict.localTask.taskId || conflict.localTask.id}｜${conflict.type}`;
+      const select = document.createElement("select");
+      select.dataset.conflictId = conflict.id;
+      PLAN_IMPORT_DECISIONS.forEach((decision) => {
+        const option = document.createElement("option");
+        option.value = decision;
+        option.textContent = labels[decision];
+        option.selected = decision === conflict.decision;
+        select.appendChild(option);
+      });
+      row.append(text, select);
+      conflicts.appendChild(row);
+    });
+  }
+  dialog.hidden = false;
+}
+
+function refreshPendingPlanPreviewFromSelections() {
+  if (!pendingPlanImport) return null;
+  const decisions = {};
+  document.querySelectorAll("#planImportConflicts [data-conflict-id]").forEach((select) => { decisions[select.dataset.conflictId] = select.value; });
+  pendingPlanImport.preview = buildPlanImportPreview(
+    pendingPlanImport.plan,
+    JSON.parse(pendingPlanImport.existingPlansJson),
+    pendingPlanImport.today,
+    decisions,
+  );
+  return pendingPlanImport.preview;
+}
+
+function cancelPlanImportPreview() {
+  pendingPlanImport = null;
+  document.querySelector("#planImportPreviewDialog").hidden = true;
+  setStatus("#backupStatus", "已取消计划导入，未写入任何数据。 ");
+}
+
+function applyPlanImportPreview() {
+  if (!pendingPlanImport) return;
+  if (JSON.stringify(readDailyPlans()) !== pendingPlanImport.existingPlansJson) {
+    const plan = pendingPlanImport.plan;
+    pendingPlanImport = null;
+    importNankaiPlanV2(plan);
+    setStatus("#backupStatus", "预览期间本地计划发生变化，已重新生成差异；请再次确认。", true);
     return;
   }
-
-  const currentDayEntry = eligibleEntries.find(([dateKey]) => dateKey === today);
-  const manualConflicts = currentDayEntry ? getManualPlanTaskConflicts(today, currentDayEntry[1], existingPlans[today]) : [];
-  let overwriteManualDescriptions = false;
-  if (manualConflicts.length) {
-    const names = [...new Set(manualConflicts.map((task) => task.name))].join("、");
-    overwriteManualDescriptions = window.confirm(`检测到今天有 ${manualConflicts.length} 项手动修改：${names}。是否用新版计划覆盖这些手动说明？选择“取消”会保留手动说明，并继续导入其他计划。`);
-  }
-
-  eligibleEntries.forEach(([dateKey, sourceDay]) => {
-    existingPlans[dateKey] = createImportedDailyPlan(dateKey, sourceDay, existingPlans[dateKey], dateKey === today && overwriteManualDescriptions);
-  });
-  writeJson(dailyPlansKey, existingPlans);
-  writeJson(importedPlanKey, {
-    planType: plan.planType,
-    schemaVersion: plan.schemaVersion,
-    startDate: plan.startDate,
-    importedAt: new Date().toISOString(),
-  });
+  const preview = refreshPendingPlanPreviewFromSelections();
+  const currentSnapshot = readRawStorageSnapshot();
+  const targetSnapshot = {
+    ...currentSnapshot,
+    [dailyPlansKey]: JSON.stringify(preview.result.dailyPlans),
+    [planPhaseTemplatesKey]: JSON.stringify(preview.result.phaseTemplates),
+    [planWindowStateKey]: JSON.stringify(makePlanWindowState(pendingPlanImport.today)),
+    [importedPlanKey]: JSON.stringify({
+      planType: pendingPlanImport.plan.planType,
+      schemaVersion: pendingPlanImport.plan.schemaVersion,
+      startDate: pendingPlanImport.plan.startDate,
+      importedAt: new Date().toISOString(),
+      detailedWindowStart: preview.window.windowStart,
+      detailedWindowEnd: preview.window.windowEnd,
+    }),
+  };
+  applyStorageSnapshotTransaction(targetSnapshot, "p0-plan-import-v1", false);
+  pendingPlanImport = null;
+  document.querySelector("#planImportPreviewDialog").hidden = true;
   renderTasks();
   renderRecentSevenDays();
   renderExamStatsConfig();
   renderExamStatsOverview();
-  const manualResult = manualConflicts.length ? (overwriteManualDescriptions ? `；已确认覆盖 ${manualConflicts.length} 项手动说明` : `；已保留 ${manualConflicts.length} 项手动说明`) : "";
-  setStatus("#backupStatus", `新版计划已导入 ${eligibleEntries.length} 天（${scopeLabel}）${manualResult}。完成状态、历史记录和专注数据均未改动。`);
+  setStatus("#backupStatus", `计划已应用：详细窗口 ${preview.window.windowStart} 至 ${preview.window.windowEnd}；远期 ${preview.farDatesConverted.length} 天已转为阶段模板。`);
 }
 
 function normalizeBackup(backup) {
@@ -157,6 +235,9 @@ function normalizeBackup(backup) {
     studyManualTimeRecords: manualTimeRecordsKey, studyDailyTargetSeconds: dailyStudyTargetsKey,
     studyExamStatsConfig: examStatsConfigKey, studyImportedPlan: importedPlanKey,
     studyProfessionalResults: professionalResultsKey,
+    studyPlanPhaseTemplates: planPhaseTemplatesKey,
+    studyPlanWindowState: planWindowStateKey,
+    studyPlanMigrationBackups: planMigrationBackupsKey,
   };
   Object.entries(mappings).forEach(([field, key]) => {
     if (Object.prototype.hasOwnProperty.call(backup, field)) values[key] = JSON.stringify(backup[field]);
@@ -241,7 +322,7 @@ function clearLearningData() {
     setStatus("#backupStatus", "二次确认未通过，未清空任何数据。 ");
     return;
   }
-  const learningKeys = [historyKey, dailyPlansKey, focusMinutesKey, taskFocusSecondsKey, focusTimerStateKey, focusSessionsKey, manualTimeRecordsKey, dailyStudyTargetsKey, examStatsConfigKey, importedPlanKey];
+  const learningKeys = [historyKey, dailyPlansKey, planPhaseTemplatesKey, planWindowStateKey, planMigrationBackupsKey, focusMinutesKey, taskFocusSecondsKey, focusTimerStateKey, focusSessionsKey, manualTimeRecordsKey, dailyStudyTargetsKey, examStatsConfigKey, importedPlanKey];
   autoSaveFields.forEach((field) => learningKeys.push(field.dataset.save));
   defaultTasks.forEach(([id]) => learningKeys.push(id, `task-label:${id}`));
   [...new Set(learningKeys)].forEach((key) => localStorage.removeItem(key));

@@ -1,11 +1,14 @@
-// v7.1 shared storage helpers. Existing learning records are preserved.
-const APP_VERSION = "7.1.0";
+// v7.2 shared storage helpers. Existing learning records are preserved.
+const APP_VERSION = "7.2.0";
 const historyKey = "review-history";
 const lastBackupKey = "lastBackupAt";
 const lastFullBackupKey = "lastFullBackupAt";
 const appDataSchemaVersionKey = "appDataSchemaVersion";
-const currentAppDataSchemaVersion = "7.1";
+const currentAppDataSchemaVersion = "7.2";
 const dailyPlansKey = "studyDailyPlans";
+const planPhaseTemplatesKey = "studyPlanPhaseTemplates";
+const planWindowStateKey = "studyPlanWindowState";
+const planMigrationBackupsKey = "studyPlanMigrationBackups";
 const focusMinutesKey = "studyFocusSeconds";
 const taskFocusSecondsKey = "studyTaskFocusSeconds";
 const focusTimerStateKey = "studyFocusTimerState";
@@ -55,6 +58,9 @@ function ensureDataSchema() {
   // Only initialize missing core fields. Never delete or overwrite legacy data.
   if (localStorage.getItem(historyKey) === null) writeJson(historyKey, []);
   if (localStorage.getItem(dailyPlansKey) === null) writeJson(dailyPlansKey, {});
+  if (localStorage.getItem(planPhaseTemplatesKey) === null) writeJson(planPhaseTemplatesKey, []);
+  if (localStorage.getItem(planWindowStateKey) === null) writeJson(planWindowStateKey, makePlanWindowState(getDateKey()));
+  if (localStorage.getItem(planMigrationBackupsKey) === null) writeJson(planMigrationBackupsKey, {});
   if (localStorage.getItem(focusMinutesKey) === null) writeJson(focusMinutesKey, {});
   if (localStorage.getItem(taskFocusSecondsKey) === null) writeJson(taskFocusSecondsKey, {});
   if (localStorage.getItem(focusSessionsKey) === null) writeJson(focusSessionsKey, []);
@@ -76,7 +82,7 @@ function ensureDataSchema() {
   }
   if (!hadStoredData && localStorage.getItem(migrationStateKey) === null) {
     writeJson(migrationStateKey, {
-      migrationId: "p0-review-results-v2",
+      migrationId: PLAN_WINDOW_MIGRATION_ID,
       status: "completed",
       source: "fresh-install",
       targetVersion: currentAppDataSchemaVersion,

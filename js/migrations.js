@@ -1,10 +1,13 @@
 // P0 trusted-execution migration: pure transformation, transactional apply, and guarded rollback.
-const TRUSTED_EXECUTION_MIGRATION_ID = "p0-review-results-v2";
+const TRUSTED_EXECUTION_MIGRATION_ID = PLAN_WINDOW_MIGRATION_ID;
 const MIGRATION_APP_SCHEMA_KEY = typeof appDataSchemaVersionKey === "string" ? appDataSchemaVersionKey : "appDataSchemaVersion";
-const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "7.1";
-const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "7.1.0";
+const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "7.2";
+const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "7.2.0";
 const MIGRATION_HISTORY_KEY = typeof historyKey === "string" ? historyKey : "review-history";
 const MIGRATION_DAILY_PLANS_KEY = typeof dailyPlansKey === "string" ? dailyPlansKey : "studyDailyPlans";
+const MIGRATION_PLAN_PHASE_TEMPLATES_KEY = typeof planPhaseTemplatesKey === "string" ? planPhaseTemplatesKey : "studyPlanPhaseTemplates";
+const MIGRATION_PLAN_WINDOW_STATE_KEY = typeof planWindowStateKey === "string" ? planWindowStateKey : "studyPlanWindowState";
+const MIGRATION_PLAN_BACKUPS_KEY = typeof planMigrationBackupsKey === "string" ? planMigrationBackupsKey : "studyPlanMigrationBackups";
 const MIGRATION_FOCUS_TOTALS_KEY = typeof focusMinutesKey === "string" ? focusMinutesKey : "studyFocusSeconds";
 const MIGRATION_TASK_FOCUS_TOTALS_KEY = typeof taskFocusSecondsKey === "string" ? taskFocusSecondsKey : "studyTaskFocusSeconds";
 const MIGRATION_FOCUS_SESSIONS_KEY = typeof focusSessionsKey === "string" ? focusSessionsKey : "studyFocusSessions";
@@ -128,7 +131,9 @@ function migrateStorageSnapshot(snapshot, options = {}) {
     return parsed;
   };
   requireArrayOrDefault(MIGRATION_HISTORY_KEY);
-  requireObjectOrDefault(MIGRATION_DAILY_PLANS_KEY);
+  const dailyPlansBefore = requireObjectOrDefault(MIGRATION_DAILY_PLANS_KEY);
+  const phaseTemplatesBefore = requireArrayOrDefault(MIGRATION_PLAN_PHASE_TEMPLATES_KEY);
+  const planBackupsBefore = requireObjectOrDefault(MIGRATION_PLAN_BACKUPS_KEY);
   requireArrayOrDefault(MIGRATION_MANUAL_TIME_KEY);
   const reviewQueueBefore = requireArrayOrDefault(MIGRATION_REVIEW_QUEUE_KEY);
   const professionalResultsBefore = requireObjectOrDefault(MIGRATION_PRO_RESULTS_KEY);
@@ -157,9 +162,7 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   }
 
   const rawSessions = requireArrayOrDefault(MIGRATION_FOCUS_SESSIONS_KEY);
-  const safeSessions = rawSessions.filter((session) => session && Math.floor(Number(session.seconds) || 0) > 0);
-  const removedZeroFocusSessions = rawSessions.length - safeSessions.length;
-  values[MIGRATION_FOCUS_SESSIONS_KEY] = JSON.stringify(safeSessions);
+  const observedZeroFocusSessions = rawSessions.filter((session) => !session || Math.floor(Number(session.seconds) || 0) <= 0).length;
   values[MIGRATION_FOCUS_TOTALS_KEY] = JSON.stringify(normalizeDateTotals(requireObjectOrDefault(MIGRATION_FOCUS_TOTALS_KEY)));
   values[MIGRATION_TASK_FOCUS_TOTALS_KEY] = JSON.stringify(normalizeTaskDateTotals(requireObjectOrDefault(MIGRATION_TASK_FOCUS_TOTALS_KEY)));
   const normalizedReviewQueue = typeof normalizeReviewQueueRecords === "function"
@@ -185,6 +188,26 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   const uiPreferences = parseStoredJson(values[MIGRATION_UI_PREFS_KEY], {});
   values[MIGRATION_UI_PREFS_KEY] = JSON.stringify({ ...DEFAULT_TRUSTED_UI_PREFERENCES, ...(isStoredObject(uiPreferences) ? uiPreferences : {}) });
   values[MIGRATION_LEGACY_BACKUP_KEY] = JSON.stringify(safeLegacy);
+  const todayKey = options.todayKey || getLocalPlanDateKey(new Date());
+  const generatedPhaseTemplates = phaseTemplatesBefore.length
+    ? phaseTemplatesBefore
+    : buildPhaseTemplatesFromDailyPlans(dailyPlansBefore);
+  const planWindowMigration = migrateDetailedPlanWindow(dailyPlansBefore, generatedPhaseTemplates, todayKey);
+  const planBackups = { ...planBackupsBefore };
+  if (Object.keys(planWindowMigration.archivedFarPlans).length && !planBackups[PLAN_WINDOW_MIGRATION_ID]) {
+    planBackups[PLAN_WINDOW_MIGRATION_ID] = {
+      schemaVersion: PLAN_WINDOW_SCHEMA_VERSION,
+      migrationId: PLAN_WINDOW_MIGRATION_ID,
+      createdAt: now,
+      window: planWindowMigration.window,
+      farDailyPlans: planWindowMigration.archivedFarPlans,
+      phaseTemplatesBefore,
+    };
+  }
+  values[MIGRATION_DAILY_PLANS_KEY] = JSON.stringify(planWindowMigration.dailyPlans);
+  values[MIGRATION_PLAN_PHASE_TEMPLATES_KEY] = JSON.stringify(generatedPhaseTemplates);
+  values[MIGRATION_PLAN_WINDOW_STATE_KEY] = JSON.stringify(makePlanWindowState(todayKey));
+  values[MIGRATION_PLAN_BACKUPS_KEY] = JSON.stringify(planBackups);
   values[MIGRATION_APP_SCHEMA_KEY] = MIGRATION_CURRENT_SCHEMA_VERSION;
 
   const report = {
@@ -199,7 +222,10 @@ function migrateStorageSnapshot(snapshot, options = {}) {
     afterCounts: null,
     archivedKeys,
     deferredActiveLegacyKeys: ACTIVE_LEGACY_KEYS_DEFERRED.filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
-    removedZeroFocusSessions,
+    observedZeroFocusSessions,
+    planWindow: planWindowMigration.window,
+    detailedPlansArchived: Object.keys(planWindowMigration.archivedFarPlans).length,
+    phaseTemplatesCreated: generatedPhaseTemplates.length,
     trimmedErrors,
     cancelledDuplicateReviews,
     lastActiveDateBefore: previousLastActiveDate,

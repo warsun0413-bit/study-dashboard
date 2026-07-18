@@ -1,7 +1,8 @@
 // v6.0 core-only application bootstrap.
 function initApp() {
-  runDataMigrations({ source: "app-start" });
+  runDataMigrations({ source: "app-start", todayKey: getDateKey() });
   ensureDataSchema();
+  rollCurrentDetailedPlanWindow();
   updateTodayDate();
   renderTasks();
   initP0Checkpoint2();
@@ -23,6 +24,13 @@ function initApp() {
     event.target.value = "";
   });
   document.querySelector("#clearLearningDataBtn").addEventListener("click", clearLearningData);
+  document.querySelector("#applyPlanImportBtn").addEventListener("click", applyPlanImportPreview);
+  document.querySelector("#cancelPlanImportBtn").addEventListener("click", cancelPlanImportPreview);
+  document.querySelector("#planImportConflicts").addEventListener("change", (event) => {
+    if (!event.target.matches("[data-conflict-id]")) return;
+    const preview = refreshPendingPlanPreviewFromSelections();
+    if (preview) renderPlanImportPreview(preview);
+  });
   bindMigrationControls();
 
   if ("serviceWorker" in navigator && ["http:", "https:"].includes(window.location.protocol)) {
