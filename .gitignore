@@ -1,0 +1,17 @@
+*.json
+!manifest.json
+*.txt
+backup/
+backups/
+exports/
+*.log
+.env
+.env.*
+!.env.example
+*.key
+secrets/
+credentials/
+api-keys/
+.DS_Store
+Thumbs.db
+tests/fixtures/private/

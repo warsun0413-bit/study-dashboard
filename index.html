@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#315c4c">
+  <meta name="description" content="简洁的学习计划执行与学习记录面板">
+  <title>南开马理论考研任务面板</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">学习计划执行 + 学习记录</p>
+      <h1>南开马理论考研任务面板</h1>
+      <p id="todayDate" class="muted"></p>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="panel exam-stats-panel" aria-labelledby="examStatsTitle">
+      <div class="section-heading">
+        <div><p class="step">考研累计学习概览</p><h2 id="examStatsTitle">从计划开始到今天</h2></div>
+        <div class="exam-stats-total"><span>累计学习总时长</span><strong id="examStatsTotal">0分钟</strong></div>
+      </div>
+      <p id="examStatsRange" class="muted exam-stats-range">统计区间：2026-07-18 至今天</p>
+      <div id="examSubjectBars" class="exam-subject-bars" aria-label="各科目累计学习时长占比"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="planTitle">
+      <div class="section-heading">
+        <div><p class="step">01 今日计划</p><h2 id="planTitle">今日时间表</h2><p id="scheduleHint" class="muted schedule-hint"></p></div>
+        <div class="rate"><strong id="completionRate">0%</strong><span id="completionText">已完成 0 / 8 项</span></div>
+      </div>
+      <div class="progress" aria-label="今日任务完成率"><span id="completionBar"></span></div>
+
+      <h3>今日任务完成状态</h3>
+      <div id="taskList" class="task-list"></div>
+      <details id="professionalResultsPanel" class="professional-results-panel">
+        <summary>722 / 844 知识单元结果</summary>
+        <p class="muted">专业课任务不能只勾选完成；请记录实际知识点、掌握度、验收结果、主要遗漏和下一准确起点。</p>
+        <input id="professionalUnitId" type="hidden">
+        <div class="professional-result-form">
+          <label>科目<select id="professionalSubject"><option value="722">722 马原</option><option value="844">844 马发史</option></select></label>
+          <label>知识单元<input id="professionalUnitName" maxlength="160" placeholder="例如：实践与认识的辩证关系"></label>
+          <label>掌握度<select id="professionalMastery"><option>L0</option><option>L1</option><option>L2</option><option>L3</option><option>L4</option><option>L5</option></select></label>
+          <label>复盘结果<select id="professionalReviewResult"><option value="unverified">未验收</option><option value="passed">通过</option><option value="partial">部分通过</option><option value="failed">未通过</option></select></label>
+          <label class="wide-field">闭卷复述结果<textarea id="professionalClosedBook" rows="2" maxlength="500" placeholder="L3—L5 必须填写真实闭卷验收结果"></textarea></label>
+          <label class="wide-field">书面重构<textarea id="professionalReconstruction" rows="2" maxlength="500"></textarea></label>
+          <label class="wide-field">原著调用<textarea id="professionalOriginalText" rows="2" maxlength="500"></textarea></label>
+          <label>主要遗漏<textarea id="professionalGaps" rows="3" maxlength="500" placeholder="一行一个；如果没有请明确填写“无”"></textarea></label>
+          <label>必须记忆<textarea id="professionalMustMemorize" rows="3" maxlength="500" placeholder="一行一个，可暂留空"></textarea></label>
+          <label class="wide-field">下一准确起点<input id="professionalNextStart" maxlength="240" placeholder="下一次从哪个具体问题或页段开始"></label>
+        </div>
+        <div class="button-row"><button id="saveProfessionalResultBtn" class="button primary" type="button">保存知识单元结果</button><button id="clearProfessionalResultBtn" class="button ghost" type="button">清空表单</button><span id="professionalResultStatus" class="status" aria-live="polite"></span></div>
+        <div id="professionalResultsList" class="professional-results-list"></div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="dueReviewsTitle">
+      <div class="section-heading">
+        <div><p class="step">今日复盘</p><h2 id="dueReviewsTitle">今日到期复盘</h2></div>
+        <strong id="dueReviewsCount" class="due-reviews-count">0 项</strong>
+      </div>
+      <div id="dueReviewsList" class="due-reviews-list"></div>
+      <p id="dueReviewsStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="execution" class="panel" aria-labelledby="executionTitle">
+      <div class="section-heading">
+        <div><p class="step">02 当前执行</p><h2 id="executionTitle">一次只推进一个任务</h2></div>
+        <button id="enterFocusModeBtn" class="button secondary" type="button">进入专注模式</button>
+      </div>
+      <div class="field-grid execution-fields">
+        <label>时间块<input id="currentTaskTime" readonly placeholder="尚未选择"></label>
+        <label>当前任务<select id="focusTask"><option value="">请选择今日任务</option></select></label>
+        <label class="execution-description">今日任务说明<textarea id="focusOutput" rows="3" readonly placeholder="点击时间表中的“设为当前任务”"></textarea></label>
+        <label class="execution-description focus-round-goal-field">本轮目标<input id="focusRoundGoalInput" maxlength="120" placeholder="例如：完成实践与认识部分闭卷复述"></label>
+      </div>
+      <div class="focus-mode-selector" aria-label="专注计时模式">
+        <span>专注模式</span>
+        <div class="button-row">
+          <button id="freeFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
+          <button id="pomodoroFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="false">25分钟番茄</button>
+        </div>
+      </div>
+      <div class="focus-totals" aria-live="polite">
+        <div><span>本次专注</span><strong id="currentFocusTime">00:00:00</strong></div>
+        <div><span>今日累计专注</span><strong id="todayFocusTotal">00:00:00</strong></div>
+        <div><span>手动补录学习</span><strong id="todayManualStudyTotal">00:00:00</strong></div>
+        <div class="study-total-highlight"><span>今日总学习时长</span><strong id="todayStudyTotal">00:00:00</strong></div>
+      </div>
+      <div class="study-target-summary" aria-live="polite">
+        <span>今日目标 <strong id="todayStudyTarget">9小时00分钟</strong></span>
+        <span>完成进度 <strong id="todayStudyProgress">0%</strong></span>
+        <span id="todayStudyRemaining">还差：9小时00分钟</span>
+      </div>
+      <details class="manual-time-entry">
+        <summary>补录学习时间</summary>
+        <div class="manual-time-form">
+          <label>小时<input id="manualStudyHours" type="number" min="0" max="24" step="1" value="0"></label>
+          <label>分钟<input id="manualStudyMinutes" type="number" min="0" max="59" step="1" value="0"></label>
+          <label>对应任务（可选）<select id="manualStudyTask"></select></label>
+          <label class="manual-time-note">简短备注（可选）<input id="manualStudyNote" maxlength="120" placeholder="例如：纸质真题复盘，未开启计时器"></label>
+          <div class="button-row manual-time-actions"><button id="saveManualStudyTimeBtn" class="button secondary" type="button">保存补录</button><span id="manualStudyStatus" class="status" aria-live="polite"></span></div>
+        </div>
+        <div id="manualStudyRecords" class="manual-time-records"></div>
+      </details>
+      <details class="daily-target-editor">
+        <summary>临时修改今日目标</summary>
+        <div class="daily-target-form">
+          <label>小时<input id="dailyTargetHours" type="number" min="0" max="24" step="1"></label>
+          <label>分钟<input id="dailyTargetMinutes" type="number" min="0" max="59" step="1"></label>
+          <div class="button-row"><button id="saveDailyTargetBtn" class="button ghost" type="button">保存今日目标</button><span id="dailyTargetStatus" class="status" aria-live="polite"></span></div>
+        </div>
+      </details>
+      <div class="pomodoro" aria-label="专注计时控制">
+        <div class="button-row">
+          <button id="startPomodoroBtn" class="button primary" type="button">开始</button>
+          <button id="pausePomodoroBtn" class="button ghost" type="button">暂停</button>
+          <button id="resetPomodoroBtn" class="button ghost" type="button">结束本次专注</button>
+          <button id="completeCurrentTaskBtn" class="button success" type="button">完成当前任务</button>
+        </div>
+      </div>
+      <p id="executionStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="reviewTitle">
+      <p class="step">03 今日学习记录</p><h2 id="reviewTitle">用五个问题完成今天的闭环</h2>
+      <div class="field-grid two-columns">
+        <label>今天完成了什么<textarea data-save="completed-today" rows="4"></textarea></label>
+        <label>今天没完成什么<textarea data-save="unfinished-today" rows="4"></textarea></label>
+        <label>为什么没完成<textarea data-save="delayed-tasks" rows="4"></textarea></label>
+        <label>今天学到了什么<textarea data-save="learned-today" rows="4"></textarea></label>
+      </div>
+      <div id="focusOutputsReference" class="focus-output-reference" hidden>
+        <strong>今日专注产出：</strong>
+        <ul id="focusOutputsList"></ul>
+      </div>
+      <label class="full-field">明天第一优先级<input data-save="tomorrow-priority" placeholder="明天开始后先做什么"></label>
+      <div class="button-row"><button id="saveReviewBtn" class="button primary" type="button">保存今日学习记录</button><span id="reviewSaveStatus" class="status" aria-live="polite"></span></div>
+    </section>
+
+    <section class="panel" aria-labelledby="historyTitle">
+      <p class="step">04 最近 7 天</p><h2 id="historyTitle">学习完成情况</h2>
+      <div id="recentSevenDays" class="seven-days"></div>
+      <h3>历史记录</h3>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+    <details class="panel data-settings">
+      <summary><span><span class="step">05 数据设置</span><strong id="dataTitle">导出、恢复或清空学习数据</strong></span></summary>
+      <div class="data-settings-body">
+        <p class="muted">完整导出包含当前浏览器中的全部字段，包括网站已停止使用的旧数据。</p>
+        <details class="migration-tools">
+          <summary>数据迁移与回滚</summary>
+          <pre id="migrationReport" class="migration-report">尚未执行迁移检查。</pre>
+          <div class="button-row">
+            <button id="rollbackMigrationBtn" class="button danger" type="button">回滚最近迁移</button>
+            <span id="migrationStatus" class="status" aria-live="polite"></span>
+          </div>
+        </details>
+        <div class="exam-stats-setting">
+          <label>考研统计开始日期<input id="examStatsStartDate" type="date"></label>
+          <button id="saveExamStatsStartDateBtn" class="button ghost" type="button">保存开始日期</button>
+          <span id="examStatsStartStatus" class="status" aria-live="polite"></span>
+          <p id="examStatsStartHint" class="muted"></p>
+        </div>
+        <div class="button-row">
+          <button id="exportJsonBtn" class="button primary" type="button">导出完整 JSON</button>
+          <button id="importJsonBtn" class="button secondary" type="button">导入新版计划 / 完整备份</button>
+          <button id="clearLearningDataBtn" class="button danger" type="button">清空学习数据</button>
+          <input id="importJsonInput" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p id="backupStatus" class="status" aria-live="polite"></p>
+      </div>
+    </details>
+  </main>
+
+  <section id="focusOverrunDialog" class="focus-overrun-dialog" role="dialog" aria-modal="true" aria-labelledby="focusOverrunTitle" hidden>
+    <div class="focus-overrun-card">
+      <p class="step">计划时长提醒</p>
+      <h2 id="focusOverrunTitle">本任务已超过计划时长30分钟</h2>
+      <p id="focusOverrunMessage" class="muted"></p>
+      <div class="button-row">
+        <button class="button primary" type="button" data-overrun-action="continue">继续专注</button>
+        <button class="button ghost" type="button" data-overrun-action="pause">暂停</button>
+        <button class="button secondary" type="button" data-overrun-action="switch">切换任务</button>
+        <button class="button success" type="button" data-overrun-action="end">结束并填写结果</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="focusModeOverlay" class="focus-overlay" hidden>
+    <section id="focusMainCard" class="focus-card" role="dialog" aria-modal="true" aria-labelledby="focusModeTitle">
+      <p class="step">专注模式</p><h2 id="focusModeTitle">当前只做这一件事</h2>
+      <p id="focusModeTask" class="focus-task">尚未选择任务</p>
+      <p id="focusModeOutput" class="focus-description muted"></p>
+      <label class="focus-round-goal">本轮目标<input id="focusModeGoalInput" maxlength="120" placeholder="写下这一轮要完成的具体结果"></label>
+      <div class="focus-mode-selector focus-overlay-selector" aria-label="专注模式计时选择">
+        <button id="focusModeFreeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
+        <button id="focusModePomodoroBtn" class="button focus-mode-button" type="button" aria-pressed="false">25分钟番茄</button>
+      </div>
+      <span class="focus-time-label">本次专注</span>
+      <strong id="focusModeTime" class="focus-time">00:00:00</strong>
+      <div class="focus-mode-totals">
+        <span>今日累计专注 <strong id="focusModeTodayTotal">00:00:00</strong></span>
+      </div>
+      <div class="button-row">
+        <button id="focusModeStartBtn" class="button primary" type="button">开始 / 继续</button>
+        <button id="focusModePauseBtn" class="button ghost" type="button">暂停</button>
+        <button id="focusModeActionBtn" class="button ghost" type="button">结束本次专注</button>
+        <button id="focusModeCompleteBtn" class="button success" type="button">完成当前任务</button>
+        <button id="exitFocusModeBtn" class="button ghost" type="button">退出专注模式</button>
+      </div>
+      <div class="focus-thought-capture">
+        <input id="focusThoughtInput" maxlength="120" placeholder="暂存一个念头……" aria-label="暂存一个念头，按回车保存">
+        <span id="focusThoughtStatus" class="status" aria-live="polite"></span>
+      </div>
+    </section>
+    <section id="focusWrapupCard" class="focus-card focus-wrapup-card" role="dialog" aria-modal="true" aria-labelledby="focusWrapupTitle" hidden>
+      <p class="step">本轮专注收尾</p>
+      <h2 id="focusWrapupTitle">用两句话结束这一轮</h2>
+      <p id="focusWrapupTask" class="focus-wrapup-task"></p>
+      <div class="focus-wrapup-summary" aria-live="polite">
+        <span>本轮实际专注 <strong id="focusWrapupDuration">00:00:00</strong></span>
+        <span>今日累计专注 <strong id="focusWrapupTodayTotal">00:00:00</strong></span>
+      </div>
+      <div class="focus-wrapup-fields">
+        <label>本轮完成了什么<input id="focusWrapupCompleted" maxlength="160" placeholder="写下这一轮的实际产出"></label>
+        <label>下一步做什么<input id="focusWrapupNext" maxlength="120" placeholder="写下下一轮最具体的一步"></label>
+      </div>
+      <div class="button-row">
+        <button id="saveWrapupExitBtn" class="button primary" type="button">保存并退出专注模式</button>
+        <button id="saveWrapupContinueBtn" class="button success" type="button">保存并继续下一轮</button>
+        <button id="skipWrapupBtn" class="button ghost" type="button">跳过</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/p0-results.js"></script>
+  <script src="js/migrations.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/focus-timer-core.js"></script>
+  <script src="js/tasks.js"></script>
+  <script src="js/study-time.js"></script>
+  <script src="js/exam-stats.js"></script>
+  <script src="js/review.js"></script>
+  <script src="js/data-safety.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "南开马理论考研任务面板",
+  "short_name": "学习面板",
+  "description": "学习计划执行与学习记录",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f3",
+  "theme_color": "#315c4c",
+  "lang": "zh-CN"
+}
