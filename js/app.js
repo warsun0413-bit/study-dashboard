@@ -15,6 +15,7 @@ function initApp() {
   initP0Final();
   initP1Results();
   initP1Output();
+  initP1Anki();
   renderHistory();
   renderRecentSevenDays();
 

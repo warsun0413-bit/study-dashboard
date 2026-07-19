@@ -1,7 +1,7 @@
-const CACHE_NAME = "study-dashboard-p1-checkpoint1-v1";
+const CACHE_NAME = "study-dashboard-p1-checkpoint3-v1";
 const APP_ASSETS = [
   "./", "./index.html", "./style.css", "./manifest.json", "./service-worker.js",
-  "./js/plan-window-core.js", "./js/p0-final-core.js", "./js/p1-results-core.js", "./js/p1-output-core.js", "./js/storage.js", "./js/p0-results.js", "./js/migrations.js", "./js/ui.js", "./js/focus-timer-core.js", "./js/tasks.js", "./js/study-time.js", "./js/exam-stats.js", "./js/review.js", "./js/data-safety.js", "./js/p1-results.js", "./js/p1-output.js", "./js/p0-final.js", "./js/app.js",
+  "./js/plan-window-core.js", "./js/p0-final-core.js", "./js/p1-results-core.js", "./js/p1-output-core.js", "./js/p1-anki-core.js", "./js/storage.js", "./js/p0-results.js", "./js/migrations.js", "./js/ui.js", "./js/focus-timer-core.js", "./js/tasks.js", "./js/study-time.js", "./js/exam-stats.js", "./js/review.js", "./js/data-safety.js", "./js/p1-results.js", "./js/p1-output.js", "./js/p1-anki.js", "./js/p0-final.js", "./js/app.js",
 ];
 
 self.addEventListener("install", (event) => {
