@@ -13,6 +13,7 @@ function initApp() {
   initStudyTime();
   initExamStats();
   initP0Final();
+  initP1Results();
   renderHistory();
   renderRecentSevenDays();
 

@@ -36,6 +36,10 @@ function makeTask(id, time, name, description, options = {}) {
     counted: Boolean(options.counted),
     exercise: Boolean(options.exercise),
     category: options.category || "",
+    ...(options.resultTrackingVersion ? {
+      resultTrackingVersion: options.resultTrackingVersion,
+      subtasks: (options.subtasks || []).map((item) => ({ ...item })),
+    } : {}),
   };
 }
 
@@ -104,7 +108,23 @@ function rollCurrentDetailedPlanWindow() {
 
 function createInitialTodayPlan(date = new Date()) {
   const isSunday = date.getDay() === 0;
-  return { template: isSunday ? "sunday" : "weekday", tasks: isSunday ? createSundayTasks() : createWeekdayTasks(date), currentTaskId: "" };
+  const tasks = isSunday ? createSundayTasks() : createWeekdayTasks(date);
+  const englishIndexes = tasks.map((task, index) => [task, index])
+    .filter(([task]) => ["englishWords", "englishReading"].includes(task.category));
+  if (englishIndexes.length === 2) {
+    const insertAt = englishIndexes[0][1];
+    const englishMain = makeTask(isSunday ? "sunday-english-main" : "english-main", "08:00—10:00", "英语", "英语单词滚动复习 + 英语阅读做题、证据定位和选项分析", {
+      counted: true,
+      category: "english",
+      resultTrackingVersion: 1,
+      subtasks: [
+        { subtaskId: "words", title: "英语单词", required: true },
+        { subtaskId: "reading", title: "英语阅读", required: true },
+      ],
+    });
+    tasks.splice(insertAt, 2, englishMain);
+  }
+  return { template: isSunday ? "sunday" : "weekday", tasks, currentTaskId: "" };
 }
 
 function findExistingTasksForPlanDefinition(existingPlan, definition) {
@@ -257,6 +277,7 @@ function renderTasks() {
     Object.entries(TASK_STATUS_LABELS).forEach(([value, label]) => select.add(new Option(label, value)));
     select.value = status;
     controls.append(select, createTaskButton("设为当前任务", "focus", task.id, "secondary"), createTaskButton("编辑说明", "edit-description", task.id));
+    if (typeof appendP1ResultSummary === "function") appendP1ResultSummary(task, content, controls);
     row.append(time, content, controls);
     list.appendChild(row);
   });
@@ -293,6 +314,15 @@ function handleTaskListChange(event) {
   const plan = getTodayPlan();
   const task = plan.tasks.find((item) => item.id === select.dataset.taskStatus);
   if (!task) return;
+  if (select.value === "completed" && typeof validateP1EnglishTaskCompletion === "function") {
+    const validation = validateP1EnglishTaskCompletion(task);
+    if (!validation.valid) {
+      select.value = getTaskStatus(task);
+      if (typeof openP1ResultDialog === "function") openP1ResultDialog("words", String(task.taskId || task.id));
+      setStatus("#p1ResultStatus", validation.message, true);
+      return;
+    }
+  }
   if (select.value === "completed" && typeof validateProfessionalTaskCompletion === "function") {
     const validation = validateProfessionalTaskCompletion(task);
     if (!validation.valid) {
@@ -315,6 +345,7 @@ function handleTaskListClick(event) {
   const plan = getTodayPlan();
   const task = plan.tasks.find((item) => item.id === action.dataset.taskId);
   if (!task) return;
+  if (typeof handleP1TaskAction === "function" && handleP1TaskAction(action.dataset.taskAction, task)) return;
   if (action.dataset.taskAction === "focus") return setCurrentTask(task.id);
   if (action.dataset.taskAction === "edit-description") {
     const description = window.prompt("今日任务说明", task.description || task.minimum || "");

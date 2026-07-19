@@ -161,6 +161,9 @@ test("17. detailed imported tasks carry the required stable and result fields", 
   assert.equal(task.completionCriteria, "阶段门槛达标");
   assert.equal(task.manualEdited, false);
   assert.deepEqual(task.actualResultRefs, []);
+  const english = day.tasks.find((item) => item.taskId === "plan-english");
+  assert.equal(english.resultTrackingVersion, 1);
+  assert.deepEqual(english.subtasks.map((item) => [item.subtaskId, item.required]), [["words", true], ["reading", true]]);
 });
 
 test("18. an unreliable name-only candidate enters conflict instead of being overwritten", () => {

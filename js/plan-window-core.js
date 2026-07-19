@@ -12,6 +12,14 @@ const PLAN_WINDOW_TASK_DEFINITIONS = [
   { taskId: "plan-politics", sourceTaskKey: "politics", subject: "公共政治", time: "19:10—20:10", name: "政治", counted: true, category: "politics" },
   { taskId: "plan-output", sourceTaskKey: "outputOrMock", subject: "专业课输出", time: "20:20—21:20", name: "输出", counted: true, category: "output" },
 ];
+const P1_ENGLISH_PLAN_DEFINITION = PLAN_WINDOW_TASK_DEFINITIONS.find((definition) => definition.sourceTaskKey === "english");
+if (P1_ENGLISH_PLAN_DEFINITION) {
+  P1_ENGLISH_PLAN_DEFINITION.resultTrackingVersion = 1;
+  P1_ENGLISH_PLAN_DEFINITION.subtasks = [
+    { subtaskId: "words", title: "英语单词", required: true },
+    { subtaskId: "reading", title: "英语阅读", required: true },
+  ];
+}
 
 function isPlanObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -73,6 +81,10 @@ function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
     counted: Boolean(definition.counted),
     exercise: Boolean(definition.exercise),
     category: definition.category,
+    ...(definition.resultTrackingVersion ? {
+      resultTrackingVersion: definition.resultTrackingVersion,
+      subtasks: definition.subtasks.map((item) => ({ ...item })),
+    } : {}),
     importedDescription: description,
   };
 }

@@ -1,8 +1,10 @@
-// P0 trusted-execution migration: pure transformation, transactional apply, and guarded rollback.
-const TRUSTED_EXECUTION_MIGRATION_ID = P0_FINAL_MIGRATION_ID;
+// Trusted-execution migration chain: preserve P0, then add P1 result containers without inference.
+const TRUSTED_EXECUTION_MIGRATION_ID = typeof P1_ENGLISH_POLITICS_MIGRATION_ID === "string"
+  ? P1_ENGLISH_POLITICS_MIGRATION_ID
+  : "p1-english-politics-results-v1";
 const MIGRATION_APP_SCHEMA_KEY = typeof appDataSchemaVersionKey === "string" ? appDataSchemaVersionKey : "appDataSchemaVersion";
-const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "7.3";
-const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "7.3.0";
+const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "8.0";
+const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "8.0.0";
 const MIGRATION_HISTORY_KEY = typeof historyKey === "string" ? historyKey : "review-history";
 const MIGRATION_DAILY_PLANS_KEY = typeof dailyPlansKey === "string" ? dailyPlansKey : "studyDailyPlans";
 const MIGRATION_PLAN_PHASE_TEMPLATES_KEY = typeof planPhaseTemplatesKey === "string" ? planPhaseTemplatesKey : "studyPlanPhaseTemplates";
@@ -16,6 +18,9 @@ const MIGRATION_DAILY_TARGETS_KEY = typeof dailyStudyTargetsKey === "string" ? d
 const MIGRATION_EXAM_CONFIG_KEY = typeof examStatsConfigKey === "string" ? examStatsConfigKey : "studyExamStatsConfig";
 const MIGRATION_REVIEW_QUEUE_KEY = typeof reviewQueueKey === "string" ? reviewQueueKey : "reviewQueue";
 const MIGRATION_PRO_RESULTS_KEY = typeof professionalResultsKey === "string" ? professionalResultsKey : "studyProfessionalResults";
+const MIGRATION_ENGLISH_WORD_RECORDS_KEY = typeof englishWordRecordsKey === "string" ? englishWordRecordsKey : "studyEnglishWordRecords";
+const MIGRATION_ENGLISH_READING_RECORDS_KEY = typeof englishReadingRecordsKey === "string" ? englishReadingRecordsKey : "studyEnglishReadingRecords";
+const MIGRATION_POLITICS_RECORDS_KEY = typeof politicsRecordsKey === "string" ? politicsRecordsKey : "studyPoliticsRecords";
 const MIGRATION_LEGACY_BACKUP_KEY = typeof legacyBackupKey === "string" ? legacyBackupKey : "legacyBackup";
 const MIGRATION_STATE_KEY = typeof migrationStateKey === "string" ? migrationStateKey : "studyMigrationState";
 const MIGRATION_REPORTS_KEY = typeof migrationReportsKey === "string" ? migrationReportsKey : "studyMigrationReports";
@@ -88,6 +93,9 @@ function getMigrationCounts(values) {
     professionalResultDays: isStoredObject(professional && professional.days)
       ? Object.keys(professional.days).length
       : isStoredObject(professional) ? Object.keys(professional).filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key)).length : 0,
+    englishWordRecords: Array.isArray(parseStoredJson(values[MIGRATION_ENGLISH_WORD_RECORDS_KEY], [])) ? parseStoredJson(values[MIGRATION_ENGLISH_WORD_RECORDS_KEY], []).length : 0,
+    englishReadingRecords: Array.isArray(parseStoredJson(values[MIGRATION_ENGLISH_READING_RECORDS_KEY], [])) ? parseStoredJson(values[MIGRATION_ENGLISH_READING_RECORDS_KEY], []).length : 0,
+    politicsRecords: Array.isArray(parseStoredJson(values[MIGRATION_POLITICS_RECORDS_KEY], [])) ? parseStoredJson(values[MIGRATION_POLITICS_RECORDS_KEY], []).length : 0,
   };
 }
 
@@ -142,6 +150,9 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   requireArrayOrDefault(MIGRATION_MANUAL_TIME_KEY);
   const reviewQueueBefore = requireArrayOrDefault(MIGRATION_REVIEW_QUEUE_KEY);
   const professionalResultsBefore = requireObjectOrDefault(MIGRATION_PRO_RESULTS_KEY);
+  requireArrayOrDefault(MIGRATION_ENGLISH_WORD_RECORDS_KEY);
+  requireArrayOrDefault(MIGRATION_ENGLISH_READING_RECORDS_KEY);
+  requireArrayOrDefault(MIGRATION_POLITICS_RECORDS_KEY);
   requireObjectOrDefault(MIGRATION_DAILY_TARGETS_KEY);
   requireObjectOrDefault(MIGRATION_EXAM_CONFIG_KEY, { startDate: "2026-07-18" });
   const legacy = parseStoredJson(values[MIGRATION_LEGACY_BACKUP_KEY], {});
