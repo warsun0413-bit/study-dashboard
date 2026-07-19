@@ -1,10 +1,11 @@
 // Trusted-execution migration chain: preserve P0, then add P1 result containers without inference.
 const P1_OUTPUT_REVIEW_MIGRATION_ID = "p1-output-review-types-v1";
 const P1_ANKI_MIGRATION_ID = "p1-anki-candidates-v1";
-const TRUSTED_EXECUTION_MIGRATION_ID = P1_ANKI_MIGRATION_ID;
+const P1_EXECUTION_DEBT_MIGRATION_ID = "p1-execution-debt-v1";
+const TRUSTED_EXECUTION_MIGRATION_ID = P1_EXECUTION_DEBT_MIGRATION_ID;
 const MIGRATION_APP_SCHEMA_KEY = typeof appDataSchemaVersionKey === "string" ? appDataSchemaVersionKey : "appDataSchemaVersion";
-const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "8.2";
-const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "8.2.0";
+const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "8.3";
+const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "8.3.0";
 const MIGRATION_HISTORY_KEY = typeof historyKey === "string" ? historyKey : "review-history";
 const MIGRATION_DAILY_PLANS_KEY = typeof dailyPlansKey === "string" ? dailyPlansKey : "studyDailyPlans";
 const MIGRATION_PLAN_PHASE_TEMPLATES_KEY = typeof planPhaseTemplatesKey === "string" ? planPhaseTemplatesKey : "studyPlanPhaseTemplates";
@@ -23,6 +24,8 @@ const MIGRATION_ENGLISH_READING_RECORDS_KEY = typeof englishReadingRecordsKey ==
 const MIGRATION_POLITICS_RECORDS_KEY = typeof politicsRecordsKey === "string" ? politicsRecordsKey : "studyPoliticsRecords";
 const MIGRATION_OUTPUT_RECORDS_KEY = typeof outputRecordsKey === "string" ? outputRecordsKey : "studyOutputRecords";
 const MIGRATION_ANKI_CANDIDATES_KEY = typeof ankiCandidatesKey === "string" ? ankiCandidatesKey : "studyAnkiCandidates";
+const MIGRATION_EXECUTION_MODES_KEY = typeof executionModesKey === "string" ? executionModesKey : "studyExecutionModes";
+const MIGRATION_DEBT_QUEUE_KEY = typeof debtQueueKey === "string" ? debtQueueKey : "studyDebtQueue";
 const MIGRATION_LEGACY_BACKUP_KEY = typeof legacyBackupKey === "string" ? legacyBackupKey : "legacyBackup";
 const MIGRATION_STATE_KEY = typeof migrationStateKey === "string" ? migrationStateKey : "studyMigrationState";
 const MIGRATION_REPORTS_KEY = typeof migrationReportsKey === "string" ? migrationReportsKey : "studyMigrationReports";
@@ -100,6 +103,7 @@ function getMigrationCounts(values) {
     politicsRecords: Array.isArray(parseStoredJson(values[MIGRATION_POLITICS_RECORDS_KEY], [])) ? parseStoredJson(values[MIGRATION_POLITICS_RECORDS_KEY], []).length : 0,
     outputRecords: Array.isArray(parseStoredJson(values[MIGRATION_OUTPUT_RECORDS_KEY], [])) ? parseStoredJson(values[MIGRATION_OUTPUT_RECORDS_KEY], []).length : 0,
     ankiCandidates: Array.isArray(parseStoredJson(values[MIGRATION_ANKI_CANDIDATES_KEY], [])) ? parseStoredJson(values[MIGRATION_ANKI_CANDIDATES_KEY], []).length : 0,
+    debtRecords: Array.isArray(parseStoredJson(values[MIGRATION_DEBT_QUEUE_KEY], [])) ? parseStoredJson(values[MIGRATION_DEBT_QUEUE_KEY], []).length : 0,
   };
 }
 
@@ -159,6 +163,8 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   requireArrayOrDefault(MIGRATION_POLITICS_RECORDS_KEY);
   requireArrayOrDefault(MIGRATION_OUTPUT_RECORDS_KEY);
   requireArrayOrDefault(MIGRATION_ANKI_CANDIDATES_KEY);
+  requireObjectOrDefault(MIGRATION_EXECUTION_MODES_KEY, { schemaVersion: 1, days: {} });
+  requireArrayOrDefault(MIGRATION_DEBT_QUEUE_KEY);
   requireObjectOrDefault(MIGRATION_DAILY_TARGETS_KEY);
   requireObjectOrDefault(MIGRATION_EXAM_CONFIG_KEY, { startDate: "2026-07-18" });
   const legacy = parseStoredJson(values[MIGRATION_LEGACY_BACKUP_KEY], {});

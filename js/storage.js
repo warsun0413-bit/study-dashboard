@@ -1,10 +1,10 @@
-// v8.2 shared storage helpers. Existing learning records are preserved.
-const APP_VERSION = "8.2.0";
+// v8.3 shared storage helpers. Existing learning records are preserved.
+const APP_VERSION = "8.3.0";
 const historyKey = "review-history";
 const lastBackupKey = "lastBackupAt";
 const lastFullBackupKey = "lastFullBackupAt";
 const appDataSchemaVersionKey = "appDataSchemaVersion";
-const currentAppDataSchemaVersion = "8.2";
+const currentAppDataSchemaVersion = "8.3";
 const dailyPlansKey = "studyDailyPlans";
 const planPhaseTemplatesKey = "studyPlanPhaseTemplates";
 const planWindowStateKey = "studyPlanWindowState";
@@ -26,6 +26,8 @@ const englishReadingRecordsKey = "studyEnglishReadingRecords";
 const politicsRecordsKey = "studyPoliticsRecords";
 const outputRecordsKey = "studyOutputRecords";
 const ankiCandidatesKey = "studyAnkiCandidates";
+const executionModesKey = "studyExecutionModes";
+const debtQueueKey = "studyDebtQueue";
 const legacyBackupKey = "legacyBackup";
 const migrationStateKey = "studyMigrationState";
 const migrationReportsKey = "studyMigrationReports";
@@ -79,6 +81,8 @@ function ensureDataSchema() {
   if (localStorage.getItem(politicsRecordsKey) === null) writeJson(politicsRecordsKey, []);
   if (localStorage.getItem(outputRecordsKey) === null) writeJson(outputRecordsKey, []);
   if (localStorage.getItem(ankiCandidatesKey) === null) writeJson(ankiCandidatesKey, []);
+  if (localStorage.getItem(executionModesKey) === null) writeJson(executionModesKey, { schemaVersion: 1, days: {} });
+  if (localStorage.getItem(debtQueueKey) === null) writeJson(debtQueueKey, []);
   if (localStorage.getItem(errorLogKey) === null) writeJson(errorLogKey, []);
   if (localStorage.getItem(uiPreferencesKey) === null) writeJson(uiPreferencesKey, {
     hideLowFrequencyModules: true,
@@ -92,7 +96,7 @@ function ensureDataSchema() {
   }
   if (!hadStoredData && localStorage.getItem(migrationStateKey) === null) {
     writeJson(migrationStateKey, {
-      migrationId: P1_ANKI_MIGRATION_ID,
+      migrationId: P1_EXECUTION_DEBT_MIGRATION_ID,
       status: "completed",
       source: "fresh-install",
       targetVersion: currentAppDataSchemaVersion,
