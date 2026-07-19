@@ -39,6 +39,11 @@ test("real backup completes the P0 final migration, snapshot, restore, and norma
   const originalPlans = JSON.parse(original.studyDailyPlans);
   const originalSessionsRaw = original.studyFocusSessions;
   const originalSessions = JSON.parse(originalSessionsRaw);
+  const originalHistory = JSON.parse(original["review-history"]);
+  const originalReviews = JSON.parse(original.reviewQueue);
+  const originalProfessional = original.studyProfessionalResults
+    ? JSON.parse(original.studyProfessionalResults)
+    : { schemaVersion: 1, days: {} };
   const originalFocusTotal = Object.values(JSON.parse(original.studyFocusSeconds)).reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0);
   const context = createContext();
   const migrated = context.api.migrate(original, { force: true, source: "p0-final-private", todayKey: "2026-07-18", now: "2026-07-18T12:00:00.000Z" });
@@ -57,26 +62,40 @@ test("real backup completes the P0 final migration, snapshot, restore, and norma
   assert.equal(originalSessions.filter((session) => Number(session && session.seconds) <= 0).length, 1);
   assert.equal(Object.values(JSON.parse(values.studyFocusSeconds)).reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0), 60906);
   assert.equal(originalFocusTotal, 60906);
-  ["completed-today", "unfinished-today", "delayed-tasks", "learned-today", "tomorrow-priority", "today-1", "today-6", "english-3", "major-3", "offlineAiPromptDraft"].forEach((key) => {
+  const retiredKeys = [
+    "completed-today", "unfinished-today", "delayed-tasks", "learned-today", "tomorrow-priority",
+    "today-1", "today-2", "today-3", "today-4", "today-5", "today-6",
+    "english-1", "english-2", "english-3", "major-1", "major-2", "major-3", "offlineAiPromptDraft",
+  ];
+  retiredKeys.forEach((key) => {
     assert.equal(Object.prototype.hasOwnProperty.call(values, key), false, `${key} was not retired`);
     assert.equal(legacy.fields[key].status, "deprecated");
+    assert.equal(legacy.fields[key].value, original[key]);
+    assert.ok(legacy.fields[key].migratedAt);
   });
+  assert.equal(legacy.schemaVersion, 1);
+  assert.ok(legacy.migratedAt);
+  assert.deepEqual(JSON.parse(values["review-history"]), originalHistory);
+  assert.deepEqual(JSON.parse(values.reviewQueue), originalReviews);
+  assert.deepEqual(JSON.parse(values.studyProfessionalResults), originalProfessional);
   assert.equal(values.lastActiveDate, "2026-07-18");
 
   const snapshot = context.api.snapshot({
     date: "2026-07-18", phaseTemplates: templates, dailyPlan: plans["2026-07-18"],
     effectiveStudySeconds: 21678, taskFocusSeconds: JSON.parse(values.studyTaskFocusSeconds)["2026-07-18"] || {},
-    professionalStore: JSON.parse(values.studyProfessionalResults), reviewQueue: JSON.parse(values.reviewQueue), history: JSON.parse(values["review-history"]),
+    professionalStore: JSON.parse(values.studyProfessionalResults), reviewQueue: JSON.parse(values.reviewQueue), history: JSON.parse(values["review-history"]), dailyPlans: plans,
   });
   assert.equal(snapshot.type, "study-dashboard-today-snapshot");
   assert.equal(snapshot.tasks.completed.length, 5);
   assert.equal(snapshot.professionalProgress["722"].actualUnits.length, 0);
   assert.equal(snapshot.professionalProgress["844"].actualUnits.length, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot.tomorrowPriority)), { value: "722", source: "tomorrow-plan" });
 
   const restored = context.api.migrate({ ...values }, { force: true, source: "backup-restore", todayKey: "2026-07-18", now: "2026-07-18T12:00:00.000Z" });
   assert.deepEqual(normalizedExport(restored.values), normalizedExport(values));
   assert.equal(restored.values.studyFocusSessions, originalSessionsRaw);
   assert.equal(restored.values.reviewQueue, values.reviewQueue);
   assert.equal(restored.values.studyProfessionalResults, values.studyProfessionalResults);
+  assert.deepEqual(JSON.parse(restored.values.legacyBackup), legacy);
   assert.equal(hash(readFileSync(fixturePath)), expectedHash);
 });

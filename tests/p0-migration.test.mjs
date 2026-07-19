@@ -3,6 +3,13 @@ import vm from "node:vm";
 import assert from "node:assert/strict";
 import { legacyStorageFixture } from "./fixtures/legacy-backup-fixture.mjs";
 
+const retiredKeys = [
+  "completed-today", "unfinished-today", "delayed-tasks", "learned-today", "tomorrow-priority",
+  "today-1", "today-2", "today-3", "today-4", "today-5", "today-6",
+  "english-1", "english-2", "english-3", "major-1", "major-2", "major-3", "offlineAiPromptDraft",
+];
+const scannedLegacyKeys = [...retiredKeys, "lastActiveDate"];
+
 const context = {
   console,
   appDataSchemaVersionKey: "appDataSchemaVersion",
@@ -42,11 +49,21 @@ assert.equal(Object.prototype.hasOwnProperty.call(first.values, "completed-today
 assert.equal(JSON.parse(first.values.legacyBackup).fields["completed-today"].value, "仍由当前版本读取");
 assert.equal(JSON.parse(first.values.legacyBackup).fields["completed-today"].status, "deprecated");
 assert.equal(JSON.parse(first.values.legacyBackup).fields["today-1"].value, "done");
+retiredKeys.filter((key) => Object.prototype.hasOwnProperty.call(legacyStorageFixture, key)).forEach((key) => {
+  const archived = JSON.parse(first.values.legacyBackup).fields[key];
+  assert.equal(archived.value, legacyStorageFixture[key]);
+  assert.equal(archived.status, "deprecated");
+  assert.ok(archived.migratedAt);
+  assert.equal(Object.prototype.hasOwnProperty.call(first.values, key), false);
+});
 assert.equal(JSON.parse(first.values.studyFocusSessions).length, 2);
 assert.equal(first.values.studyFocusSessions, legacyStorageFixture.studyFocusSessions);
-assert.equal(JSON.parse(first.values.studyErrorLog).length, 50);
+assert.equal(first.values.studyErrorLog, legacyStorageFixture.studyErrorLog);
+assert.equal(JSON.parse(first.values.studyErrorLog).length, JSON.parse(legacyStorageFixture.studyErrorLog).length);
 assert.equal(JSON.parse(first.values.studyFocusSeconds)["2026-07-18"], 0);
 assert.equal(first.values.lastActiveDate, "2026-07-18");
+assert.equal(JSON.parse(first.values.legacyBackup).fields.lastActiveDate.value, legacyStorageFixture.lastActiveDate);
+assert.equal(JSON.parse(first.values.legacyBackup).fields.lastActiveDate.status, "deprecated");
 assert.equal(first.report.beforeCounts.historyRecords, first.report.afterCounts.historyRecords);
 assert.equal(first.report.beforeCounts.manualTimeRecords, first.report.afterCounts.manualTimeRecords);
 assert.equal(JSON.parse(first.values.studyProfessionalResults).schemaVersion, 1);
@@ -81,5 +98,19 @@ context.localStorage = failingStorage;
 assert.throws(() => context.applyFixtureTransaction({ a: "new-a", b: "new-b" }, "test-rollback"), /simulated-write-failure/);
 assert.equal(failingStorage.getItem("a"), "old-a");
 assert.equal(failingStorage.getItem("b"), "old-b");
+
+const runtimeFiles = ["js/app.js", "js/storage.js", "js/tasks.js", "js/review.js", "js/p0-final.js", "js/p0-final-core.js", "js/study-time.js", "js/focus-timer.js"];
+const runtimeSource = runtimeFiles.filter(fs.existsSync).map((file) => fs.readFileSync(file, "utf8")).join("\n");
+scannedLegacyKeys.forEach((key) => {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.doesNotMatch(runtimeSource, new RegExp(`localStorage\\.(?:getItem|setItem)\\(\\s*[\"']${escaped}[\"']`), `${key} remains a runtime storage source`);
+});
+
+const futureOnly = context.runFixtureMigration({
+  studyDailyPlans: JSON.stringify({ "2026-07-20": { tasks: [{ taskId: "future", status: "completed", actualResult: { note: "未来记录" } }] } }),
+  lastActiveDate: "2026-07-20",
+}, { now: "2026-07-19T02:00:00.000Z", todayKey: "2026-07-19", source: "future-only-test", force: true });
+assert.equal(Object.prototype.hasOwnProperty.call(futureOnly.values, "lastActiveDate"), false);
+assert.equal(futureOnly.report.lastActiveDateAfter, "");
 
 console.log("P0_MIGRATION_TEST_OK");

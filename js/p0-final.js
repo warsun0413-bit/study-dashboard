@@ -13,6 +13,7 @@ function getCurrentP0Snapshot() {
     professionalStore: readJson(professionalResultsKey, {}),
     reviewQueue: readJson(reviewQueueKey, []),
     history: readHistory(),
+    dailyPlans: plans,
   });
 }
 
@@ -89,6 +90,19 @@ async function copyP0ControlMarkdown() {
 }
 
 function initP0Final() {
+  const preferences = readJson(uiPreferencesKey, {});
+  if (preferences.hideLowFrequencyModules === true) {
+    document.querySelectorAll("details.low-frequency-panel").forEach((panel) => { panel.open = false; });
+  }
+  const systemTools = document.querySelector("#systemToolsPanel");
+  if (systemTools && preferences.autoCollapseSystemTools !== false) systemTools.open = false;
+  [
+    ["ai-usage-log", "showAiUsageLog"],
+    ["ai-cost-estimate", "showAiCostEstimate"],
+    ["recent-commands", "showRecentCommands"],
+  ].forEach(([name, key]) => {
+    document.querySelectorAll(`[data-system-tool="${name}"]`).forEach((module) => { module.hidden = preferences[key] !== true; });
+  });
   document.querySelector("#exportTodaySnapshotBtn").addEventListener("click", downloadP0TodaySnapshot);
   document.querySelector("#copyControlMarkdownBtn").addEventListener("click", copyP0ControlMarkdown);
   renderP0FinalHome();

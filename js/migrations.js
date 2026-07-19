@@ -91,7 +91,7 @@ function getMigrationCounts(values) {
   };
 }
 
-function getLatestActualDate(values) {
+function getLatestActualDate(values, todayKey) {
   return getLatestP0FormalActivityDate({
     history: parseStoredJson(values[MIGRATION_HISTORY_KEY], []),
     focusTotals: parseStoredJson(values[MIGRATION_FOCUS_TOTALS_KEY], {}),
@@ -101,11 +101,12 @@ function getLatestActualDate(values) {
     professionalStore: parseStoredJson(values[MIGRATION_PRO_RESULTS_KEY], {}),
     reviewQueue: parseStoredJson(values[MIGRATION_REVIEW_QUEUE_KEY], []),
     dailyPlans: parseStoredJson(values[MIGRATION_DAILY_PLANS_KEY], {}),
-  });
+  }, todayKey);
 }
 
 function migrateStorageSnapshot(snapshot, options = {}) {
   const now = options.now || new Date().toISOString();
+  const todayKey = options.todayKey || getLocalPlanDateKey(new Date());
   const source = { ...(snapshot || {}) };
   delete source[MIGRATION_ROLLBACK_KEY];
   const existingState = parseStoredJson(source[MIGRATION_STATE_KEY], {});
@@ -179,7 +180,7 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   if (Object.prototype.hasOwnProperty.call(values, "lastActiveDate") && !safeLegacy.fields.lastActiveDate) {
     safeLegacy.fields.lastActiveDate = { value: values.lastActiveDate, status: "deprecated", replacedBy: "derived-from-formal-records", migratedAt: now };
   }
-  const latestActualDate = getLatestActualDate(values);
+  const latestActualDate = getLatestActualDate(values, todayKey);
   if (latestActualDate) values.lastActiveDate = latestActualDate;
   else delete values.lastActiveDate;
   if (previousLastActiveDate !== latestActualDate && !safeLegacy.migrations.some((entry) => entry && entry.migrationId === P0_FINAL_MIGRATION_ID && entry.key === "lastActiveDate")) {
@@ -200,20 +201,12 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   values[MIGRATION_PRO_RESULTS_KEY] = JSON.stringify(normalizedProfessionalResults);
   const cancelledDuplicateReviews = normalizedReviewQueue.filter((record) => record && record.duplicateOf).length;
 
-  let trimmedErrors = 0;
-  KNOWN_ERROR_LOG_KEYS.forEach((key) => {
-    if (!Object.prototype.hasOwnProperty.call(values, key)) return;
-    const logs = parseStoredJson(values[key], []);
-    if (!Array.isArray(logs)) return;
-    trimmedErrors += Math.max(0, logs.length - 50);
-    values[key] = JSON.stringify(logs.slice(-50));
-  });
+  const trimmedErrors = 0;
 
   if (!Object.prototype.hasOwnProperty.call(values, MIGRATION_ERROR_LOG_KEY)) values[MIGRATION_ERROR_LOG_KEY] = "[]";
   const uiPreferences = parseStoredJson(values[MIGRATION_UI_PREFS_KEY], {});
   values[MIGRATION_UI_PREFS_KEY] = JSON.stringify({ ...DEFAULT_TRUSTED_UI_PREFERENCES, ...(isStoredObject(uiPreferences) ? uiPreferences : {}) });
   values[MIGRATION_LEGACY_BACKUP_KEY] = JSON.stringify(safeLegacy);
-  const todayKey = options.todayKey || getLocalPlanDateKey(new Date());
   const generatedPhaseTemplates = phaseTemplatesBefore.length
     ? phaseTemplatesBefore
     : buildPhaseTemplatesFromDailyPlans(dailyPlansBefore);
@@ -254,7 +247,7 @@ function migrateStorageSnapshot(snapshot, options = {}) {
     trimmedErrors,
     cancelledDuplicateReviews,
     lastActiveDateBefore: previousLastActiveDate,
-    lastActiveDateAfter: latestActualDate || previousLastActiveDate,
+    lastActiveDateAfter: latestActualDate,
   };
   values[MIGRATION_STATE_KEY] = JSON.stringify({
     migrationId: TRUSTED_EXECUTION_MIGRATION_ID,

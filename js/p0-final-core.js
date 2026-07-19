@@ -70,12 +70,37 @@ function normalizeP0Review(record, index = 0) {
   };
 }
 
+function isP0ActiveReview(review) {
+  return review.status === "pending"
+    && Boolean(review.dueDate)
+    && !review.duplicateOf
+    && !review.supersededBy
+    && !review.rescheduledTo
+    && review.invalid !== true;
+}
+
+function getP0ReviewCompletedDate(review) {
+  if (isPlanDateKey(review && review.completedDate)) return review.completedDate;
+  const completedAt = new Date(review && review.completedAt || "");
+  return Number.isNaN(completedAt.getTime()) ? "" : getLocalPlanDateKey(completedAt);
+}
+
+function uniqueP0Reviews(reviews) {
+  const seen = new Set();
+  return reviews.filter((review) => {
+    const key = review.reviewKey || review.reviewId;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getP0ReviewFacts(queue, todayKey) {
   const tomorrow = addLocalPlanDays(todayKey, 1);
-  const active = (Array.isArray(queue) ? queue : []).map(normalizeP0Review)
-    .filter((review) => review.status === "pending" && review.dueDate);
-  const completedToday = (Array.isArray(queue) ? queue : []).map(normalizeP0Review)
-    .filter((review) => review.status === "completed" && review.completedDate === todayKey);
+  const active = uniqueP0Reviews((Array.isArray(queue) ? queue : []).map(normalizeP0Review)
+    .filter(isP0ActiveReview));
+  const completedToday = uniqueP0Reviews((Array.isArray(queue) ? queue : []).map(normalizeP0Review)
+    .filter((review) => review.status === "completed" && getP0ReviewCompletedDate(review) === todayKey));
   return {
     completedToday,
     overdue: active.filter((review) => review.dueDate < todayKey),
@@ -108,7 +133,7 @@ function buildP0TopPriorities(dailyPlan, reviewQueue, todayKey, limit = 3) {
   const candidates = [];
   const seen = new Set();
   (Array.isArray(reviewQueue) ? reviewQueue : []).map(normalizeP0Review)
-    .filter((review) => review.status === "pending" && review.dueDate && review.dueDate <= todayKey)
+    .filter((review) => isP0ActiveReview(review) && review.dueDate <= todayKey)
     .forEach((review) => {
       const key = `review:${review.reviewKey || review.reviewId}`;
       if (seen.has(key)) return;
@@ -121,7 +146,7 @@ function buildP0TopPriorities(dailyPlan, reviewQueue, todayKey, limit = 3) {
       });
     });
   const tasks = dailyPlan && Array.isArray(dailyPlan.tasks) ? dailyPlan.tasks : [];
-  tasks.filter((task) => p0IsLearningTask(task) && !["completed", "skipped"].includes(p0TaskStatus(task))).forEach((task, index) => {
+  tasks.filter((task) => p0IsLearningTask(task) && task.status !== "cancelled" && !["completed", "skipped"].includes(p0TaskStatus(task))).forEach((task, index) => {
     const stable = task.taskId || task.id || task.sourceTaskKey || `custom-${index}`;
     const key = `task:${stable}`;
     if (seen.has(key)) return;
@@ -134,6 +159,38 @@ function buildP0TopPriorities(dailyPlan, reviewQueue, todayKey, limit = 3) {
     });
   });
   return candidates.sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key)).slice(0, limit);
+}
+
+function getP0TomorrowPriority(input = {}) {
+  const todayKey = isPlanDateKey(input.todayKey) ? input.todayKey : getLocalPlanDateKey();
+  const tomorrowKey = addLocalPlanDays(todayKey, 1);
+  const history = Array.isArray(input.history) ? input.history : [];
+  const manual = history.find((record) => record && record.date === todayKey && String(record.tomorrowPriority || "").trim());
+  if (manual) return { value: p0Text(manual.tomorrowPriority), source: "manual-review-history" };
+
+  const tomorrowReview = getP0ReviewFacts(input.reviewQueue, todayKey).dueTomorrow[0];
+  if (tomorrowReview) {
+    return {
+      value: `${tomorrowReview.reviewLevel || "复盘"} · ${tomorrowReview.subject || ""} · ${tomorrowReview.knowledgeUnit || tomorrowReview.task || "未命名复盘"}`,
+      source: "review-queue",
+    };
+  }
+
+  const plans = isP0Object(input.dailyPlans) ? input.dailyPlans : {};
+  const tasks = plans[tomorrowKey] && Array.isArray(plans[tomorrowKey].tasks) ? plans[tomorrowKey].tasks : [];
+  const seen = new Set();
+  const candidate = tasks
+    .filter((task) => p0IsLearningTask(task) && task.status !== "cancelled" && !["completed", "skipped"].includes(p0TaskStatus(task)))
+    .filter((task, index) => {
+      const key = task.taskId || task.sourceTaskKey || task.id || `custom-${index}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => getP0TaskPriorityRank(a) - getP0TaskPriorityRank(b))[0];
+  return candidate
+    ? { value: p0Text(candidate.name || candidate.title, "未命名任务"), source: "tomorrow-plan" }
+    : { value: "未记录", source: "none" };
 }
 
 function getP0TaskEndMinutes(timeText) {
@@ -201,6 +258,8 @@ function buildP0TodaySnapshot(input = {}) {
   });
   const byStatus = (status) => taskSnapshots.filter((task) => task.status === status);
   const unfinished = taskSnapshots.filter((task) => !["completed", "partial", "in-progress", "skipped"].includes(task.status));
+  if (reviews.overdue.length) warnings.push(`存在${reviews.overdue.length}项逾期复盘`);
+  if (unfinished.length) warnings.push(`今日有${unfinished.length}项明确未完成任务`);
   return {
     schemaVersion: P0_FINAL_SCHEMA_VERSION,
     type: P0_TODAY_SNAPSHOT_TYPE,
@@ -218,7 +277,12 @@ function buildP0TodaySnapshot(input = {}) {
     reviews: { completedToday: reviews.completedToday, overdue: reviews.overdue, dueTomorrow: reviews.dueTomorrow },
     unfinishedSummary: unfinished.map((task) => task.title),
     warnings,
-    tomorrowPriority: p0Text(todayRecord && todayRecord.tomorrowPriority),
+    tomorrowPriority: getP0TomorrowPriority({
+      todayKey: date,
+      history,
+      reviewQueue: input.reviewQueue,
+      dailyPlans: input.dailyPlans,
+    }),
   };
 }
 
@@ -258,23 +322,34 @@ function buildP0ControlMarkdown(snapshot) {
     `逾期复盘：${reviewLine("overdue")}`,
     `明日到期复盘：${reviewLine("dueTomorrow")}`,
     `今日主要问题：${p0JoinSnapshotItems([...(data.unfinishedSummary || []), ...(data.warnings || [])], (item) => item)}`,
-    `明日最高优先级：${p0Text(data.tomorrowPriority)}`,
+    `明日最高优先级：${p0Text(data.tomorrowPriority && data.tomorrowPriority.value)}`,
+    `优先级来源：${p0Text(data.tomorrowPriority && data.tomorrowPriority.source)}`,
   ].join("\n");
 }
 
-function getLatestP0FormalActivityDate(values = {}) {
+function getLatestP0FormalActivityDate(values = {}, todayKey = getLocalPlanDateKey()) {
   const dates = [];
-  const add = (dateKey) => { if (isPlanDateKey(dateKey)) dates.push(dateKey); };
+  const add = (dateKey) => { if (isPlanDateKey(dateKey) && dateKey <= todayKey) dates.push(dateKey); };
   (Array.isArray(values.history) ? values.history : []).forEach((record) => add(record && record.date));
   Object.entries(isP0Object(values.focusTotals) ? values.focusTotals : {}).forEach(([date, seconds]) => { if (Number(seconds) > 0) add(date); });
   Object.entries(isP0Object(values.taskFocusTotals) ? values.taskFocusTotals : {}).forEach(([date, totals]) => { if (Object.values(isP0Object(totals) ? totals : {}).some((seconds) => Number(seconds) > 0)) add(date); });
-  (Array.isArray(values.manualRecords) ? values.manualRecords : []).forEach((record) => { if (Number(record && record.durationSeconds) > 0) add(record.date); });
+  (Array.isArray(values.manualRecords) ? values.manualRecords : []).forEach((record) => {
+    const text = `${record && record.taskId || ""} ${record && record.taskTitle || ""}`;
+    if (Number(record && record.durationSeconds) > 0 && !/训练|锻炼|午饭|午休|洗澡|吃饭|休息|睡觉/.test(text)) add(record.date);
+  });
   (Array.isArray(values.focusSessions) ? values.focusSessions : []).forEach((session) => { if (Number(session && session.seconds) > 0) add(session.date); });
   const professionalDays = isP0Object(values.professionalStore) && isP0Object(values.professionalStore.days) ? values.professionalStore.days : {};
-  Object.keys(professionalDays).forEach(add);
-  (Array.isArray(values.reviewQueue) ? values.reviewQueue : []).forEach((review) => { if (review && review.status === "completed") add(review.completedDate); });
+  Object.entries(professionalDays).forEach(([date, day]) => {
+    const hasActualResult = isP0Object(day) && Object.values(day).some((subject) => isP0Object(subject)
+      && Array.isArray(subject.units) && subject.units.some((unit) => isP0Object(unit) && Object.values(unit).some((value) => Array.isArray(value) ? value.length : String(value || "").trim())));
+    if (hasActualResult) add(date);
+  });
+  (Array.isArray(values.reviewQueue) ? values.reviewQueue : []).forEach((review) => {
+    if (review && review.status === "completed") add(getP0ReviewCompletedDate(review));
+  });
   Object.entries(isP0Object(values.dailyPlans) ? values.dailyPlans : {}).forEach(([date, plan]) => {
-    if (plan && Array.isArray(plan.tasks) && plan.tasks.some((task) => ["in-progress", "completed", "skipped", "partial"].includes(p0TaskStatus(task)))) add(date);
+    if (plan && Array.isArray(plan.tasks) && plan.tasks.some((task) => ["in-progress", "completed", "partial"].includes(p0TaskStatus(task))
+      || (task && isP0Object(task.actualResult) && Object.values(task.actualResult).some((value) => String(value || "").trim())))) add(date);
   });
   return dates.sort().at(-1) || "";
 }

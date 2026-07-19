@@ -1,4 +1,4 @@
-const CACHE_NAME = "study-dashboard-p0-checkpoint5-final-v1";
+const CACHE_NAME = "study-dashboard-p0-checkpoint5-closeout-v2";
 const APP_ASSETS = [
   "./", "./index.html", "./style.css", "./manifest.json", "./service-worker.js",
   "./js/plan-window-core.js", "./js/p0-final-core.js", "./js/storage.js", "./js/p0-results.js", "./js/migrations.js", "./js/ui.js", "./js/focus-timer-core.js", "./js/tasks.js", "./js/study-time.js", "./js/exam-stats.js", "./js/review.js", "./js/data-safety.js", "./js/p0-final.js", "./js/app.js",
