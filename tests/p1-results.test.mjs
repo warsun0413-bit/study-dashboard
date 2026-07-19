@@ -71,6 +71,18 @@ test("politics candidates are stable, deduplicated, and never invent fuzzy repea
   assert.deepEqual(api.generatePoliticsReviewCandidates({ ...second, reviewCandidates: candidates }, [first], { now }), candidates);
 });
 
+test("politics phase-A contract uses weighted totals and explicit K M L W candidates only", () => {
+  const record = api.normalizePoliticsRecord({ date, taskId: "plan-politics", singleChoiceTotal: 10, singleChoiceCorrect: 8, multipleChoiceTotal: 10, multipleChoiceCorrect: 6, guessedTotal: 3, guessedCorrect: 2, errorCodes: { K: 1, M: 1, L: 1, W: 1, C: 1, G: 1 }, weakPoints: [
+    { knowledgePointId: "k", knowledgePoint: "K点", reasonCode: "K" }, { knowledgePointId: "m", knowledgePoint: "M点", reasonCode: "M" },
+    { knowledgePointId: "l", knowledgePoint: "L点", reasonCode: "L" }, { knowledgePointId: "w", knowledgePoint: "W点", reasonCode: "W" },
+    { knowledgePointId: "c", knowledgePoint: "C点", reasonCode: "C" }, { knowledgePointId: "g", knowledgePoint: "G点", reasonCode: "G" },
+  ] }, { now });
+  const accuracy = api.calculatePoliticsAccuracy(record);
+  assert.equal(accuracy.singleChoiceAccuracy, 0.8); assert.equal(accuracy.multipleChoiceAccuracy, 0.6); assert.equal(accuracy.totalAccuracy, 0.7); assert.equal(accuracy.guessedAccuracy, 2 / 3);
+  const candidates = api.generatePoliticsReviewCandidates(record, [], { now });
+  assert.deepEqual(candidates.map((item) => [item.reasonCode, item.suggestedReview]), [["K", "D1"], ["M", "D1"], ["L", "option-trap"], ["W", "option-trap"]]);
+});
+
 test("old completed or focus-like fields never produce detailed results", () => {
   assert.equal(api.deriveEnglishTaskStatus(null, null, { legacyCompleted: true }), "legacy-unstructured");
   assert.equal(api.deriveEnglishTaskStatus(null, null, { focusSeconds: 3600 }), "not-started");

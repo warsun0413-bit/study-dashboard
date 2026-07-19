@@ -173,3 +173,20 @@ test("18. an unreliable name-only candidate enters conflict instead of being ove
   assert.equal(preview.unmatchedConflicts[0].decision, "keep-local");
   assert.equal(preview.result.dailyPlans["2026-07-18"].tasks[0].description, "自定义");
 });
+
+test("19. P1 plan metadata is previewed and preserved without creating business records", () => {
+  const plan = makePlan();
+  plan.dailyPlans["2026-07-18"].executionMode = "compressed";
+  plan.dailyPlans["2026-07-18"].p1Metadata = { dueReviews: ["review-a"] };
+  plan.dailyPlans["2026-07-18"].tasks.english.englishSubtasks = { words: { plannedMinutes: 20 }, reading: { plannedMinutes: 50 } };
+  plan.dailyPlans["2026-07-18"].tasks.politics.politicsTarget = { chapter: "第一章", questions: 20 };
+  const before = JSON.stringify(plan);
+  const preview = plain(core.buildPlanImportPreview(plan, {}, "2026-07-18"));
+  const day = preview.result.dailyPlans["2026-07-18"];
+  assert.deepEqual(preview.p1MetadataChanges, ["2026-07-18"]);
+  assert.deepEqual(day.p1Metadata, { dueReviews: ["review-a"] });
+  assert.deepEqual(day.tasks.find((task) => task.sourceTaskKey === "english").englishSubtasks, { words: { plannedMinutes: 20 }, reading: { plannedMinutes: 50 } });
+  assert.equal(JSON.stringify(plan), before);
+  assert.equal(Object.prototype.hasOwnProperty.call(preview.result, "reviewQueue"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(preview.result, "studyDebtQueue"), false);
+});

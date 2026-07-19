@@ -12,7 +12,7 @@ const hash = (buffer) => createHash("sha256").update(buffer).digest("hex").toUpp
 function createContext() {
   const context = vm.createContext({
     console, Date,
-    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.3", APP_VERSION: "8.3.0",
+    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.4", APP_VERSION: "8.4.0",
     historyKey: "review-history", dailyPlansKey: "studyDailyPlans", planPhaseTemplatesKey: "studyPlanPhaseTemplates",
     planWindowStateKey: "studyPlanWindowState", planMigrationBackupsKey: "studyPlanMigrationBackups",
     focusMinutesKey: "studyFocusSeconds", taskFocusSecondsKey: "studyTaskFocusSeconds", focusSessionsKey: "studyFocusSessions",
@@ -52,7 +52,7 @@ test("real backup completes the P0 final migration, snapshot, restore, and norma
   const legacy = JSON.parse(values.legacyBackup);
   const templates = JSON.parse(values.studyPlanPhaseTemplates);
 
-  assert.equal(values.appDataSchemaVersion, "8.3");
+  assert.equal(values.appDataSchemaVersion, "8.4");
   assert.equal(Object.keys(plans).length, 10);
   assert.equal(Object.keys(plans).filter((date) => date >= "2026-07-18").length, 7);
   assert.equal(templates.length, 10);

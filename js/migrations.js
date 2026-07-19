@@ -2,10 +2,11 @@
 const P1_OUTPUT_REVIEW_MIGRATION_ID = "p1-output-review-types-v1";
 const P1_ANKI_MIGRATION_ID = "p1-anki-candidates-v1";
 const P1_EXECUTION_DEBT_MIGRATION_ID = "p1-execution-debt-v1";
-const TRUSTED_EXECUTION_MIGRATION_ID = P1_EXECUTION_DEBT_MIGRATION_ID;
+const P1_FINAL_INTEGRATION_MIGRATION_ID = typeof P1_FINAL_MIGRATION_ID === "string" ? P1_FINAL_MIGRATION_ID : "p1-final-integration-v1";
+const TRUSTED_EXECUTION_MIGRATION_ID = P1_FINAL_INTEGRATION_MIGRATION_ID;
 const MIGRATION_APP_SCHEMA_KEY = typeof appDataSchemaVersionKey === "string" ? appDataSchemaVersionKey : "appDataSchemaVersion";
-const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "8.3";
-const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "8.3.0";
+const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "8.4";
+const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "8.4.0";
 const MIGRATION_HISTORY_KEY = typeof historyKey === "string" ? historyKey : "review-history";
 const MIGRATION_DAILY_PLANS_KEY = typeof dailyPlansKey === "string" ? dailyPlansKey : "studyDailyPlans";
 const MIGRATION_PLAN_PHASE_TEMPLATES_KEY = typeof planPhaseTemplatesKey === "string" ? planPhaseTemplatesKey : "studyPlanPhaseTemplates";

@@ -126,6 +126,7 @@ function renderPlanImportPreview(preview) {
     ["保留本地值", preview.keepLocal.length],
     ["采用导入值", preview.useImport.length],
     ["生成阶段模板", preview.phaseTemplates.length],
+    ["P1元数据日期", preview.p1MetadataChanges.length],
   ].forEach(([label, value]) => {
     const row = document.createElement("div");
     row.innerHTML = `<span>${label}</span><strong>${value}</strong>`;

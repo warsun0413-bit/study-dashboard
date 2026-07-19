@@ -66,6 +66,10 @@ function getTaskStatusForPlan(task) {
 function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
   const description = String(sourceTask && sourceTask.description || sourceTask || "").trim();
   const status = defaultStatus === "已完成" ? "completed" : defaultStatus === "进行中" ? "in-progress" : "not-started";
+  const p1Metadata = {};
+  ["englishSubtasks", "politicsTarget", "outputType", "ankiTask", "debtSchedule", "nextStart", "dueReviews", "originalPlan", "adjustedPlan", "executionMode"].forEach((key) => {
+    if (sourceTask && Object.prototype.hasOwnProperty.call(sourceTask, key)) p1Metadata[key] = JSON.parse(JSON.stringify(sourceTask[key]));
+  });
   return {
     id: definition.taskId,
     taskId: definition.taskId,
@@ -86,6 +90,7 @@ function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
       subtasks: definition.subtasks.map((item) => ({ ...item })),
     } : {}),
     importedDescription: description,
+    ...p1Metadata,
   };
 }
 
@@ -117,6 +122,8 @@ function createDetailedPlanFromSource(dateKey, sourceDay, fixedSchedule = []) {
     weekday: String(sourceDay && sourceDay.weekday || ""),
     phase: String(sourceDay && sourceDay.phase || ""),
     targetEffectiveStudyHours: Number(sourceDay && sourceDay.targetEffectiveStudyHours) || 0,
+    executionMode: typeof EXECUTION_MODES !== "undefined" && EXECUTION_MODES.includes(sourceDay && sourceDay.executionMode) ? sourceDay.executionMode : "normal",
+    p1Metadata: sourceDay && isPlanObject(sourceDay.p1Metadata) ? JSON.parse(JSON.stringify(sourceDay.p1Metadata)) : {},
     tasks,
     currentTaskId: "",
   };
@@ -373,12 +380,13 @@ function buildPlanImportPreview(plan, existingPlans, todayKey, decisions = {}) {
     window,
     newDates: [], newTasks: [], updatedTasks: [], skippedHistoryDates: [],
     completedConflicts: [], inProgressConflicts: [], manualEditedConflicts: [], unmatchedConflicts: [],
-    customTasks: [], farDatesConverted: [], keepLocal: [], useImport: [], conflicts: [],
+    customTasks: [], farDatesConverted: [], keepLocal: [], useImport: [], conflicts: [], p1MetadataChanges: [],
   };
   Object.entries(plan.dailyPlans || {}).sort(([left], [right]) => left.localeCompare(right)).forEach(([dateKey, sourceDay]) => {
     if (dateKey < window.windowStart) { preview.skippedHistoryDates.push(dateKey); return; }
     if (dateKey > window.windowEnd) { preview.farDatesConverted.push(dateKey); delete nextPlans[dateKey]; return; }
     const importedDay = createDetailedPlanFromSource(dateKey, sourceDay, plan.fixedSchedule);
+    if (sourceDay && (sourceDay.executionMode || sourceDay.p1Metadata || Object.values(sourceDay.tasks || {}).some((task) => task && ["englishSubtasks", "politicsTarget", "outputType", "ankiTask", "debtSchedule", "nextStart", "dueReviews"].some((key) => Object.prototype.hasOwnProperty.call(task, key))))) preview.p1MetadataChanges.push(dateKey);
     const localDay = nextPlans[dateKey];
     if (!localDay) {
       nextPlans[dateKey] = importedDay;

@@ -70,13 +70,14 @@ function renderP0FinalHome() {
 }
 
 function downloadP0TodaySnapshot() {
-  const snapshot = getCurrentP0Snapshot();
+  const snapshot = typeof getCurrentP1Snapshot === "function" ? getCurrentP1Snapshot() : getCurrentP0Snapshot();
   downloadFile(`学习面板今日快照-${snapshot.date}.json`, JSON.stringify(snapshot, null, 2), "application/json;charset=utf-8");
   setStatus("#todaySnapshotStatus", "今日快照已导出；未修改任何学习数据。 ");
 }
 
 async function copyP0ControlMarkdown() {
-  const markdown = buildP0ControlMarkdown(getCurrentP0Snapshot());
+  const snapshot = typeof getCurrentP1Snapshot === "function" ? getCurrentP1Snapshot() : getCurrentP0Snapshot();
+  const markdown = typeof buildP1ControlMarkdown === "function" ? buildP1ControlMarkdown(snapshot) : buildP0ControlMarkdown(snapshot);
   try {
     await navigator.clipboard.writeText(markdown);
     setStatus("#todaySnapshotStatus", "精简总控回传版已复制；未写入 localStorage。 ");
