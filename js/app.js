@@ -12,6 +12,7 @@ function initApp() {
   restorePomodoroStateFromStorage();
   initStudyTime();
   initExamStats();
+  initP0Final();
   renderHistory();
   renderRecentSevenDays();
 

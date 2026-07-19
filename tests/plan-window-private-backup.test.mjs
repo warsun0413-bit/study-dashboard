@@ -15,7 +15,7 @@ const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex").toU
 function makeMigrationContext() {
   const context = vm.createContext({
     console, Date,
-    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "7.2", APP_VERSION: "7.2.0",
+    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "7.3", APP_VERSION: "7.3.0",
     historyKey: "review-history", dailyPlansKey: "studyDailyPlans",
     planPhaseTemplatesKey: "studyPlanPhaseTemplates", planWindowStateKey: "studyPlanWindowState", planMigrationBackupsKey: "studyPlanMigrationBackups",
     focusMinutesKey: "studyFocusSeconds", taskFocusSecondsKey: "studyTaskFocusSeconds", focusSessionsKey: "studyFocusSessions",
@@ -24,7 +24,7 @@ function makeMigrationContext() {
     migrationStateKey: "studyMigrationState", migrationReportsKey: "studyMigrationReports", migrationRollbackKey: "studyMigrationRollback",
     errorLogKey: "studyErrorLog", uiPreferencesKey: "studyUiPreferences",
   });
-  vm.runInContext(`${readFileSync(path.resolve("js/plan-window-core.js"), "utf8")}\n${readFileSync(path.resolve("js/p0-results.js"), "utf8")}\n${readFileSync(path.resolve("js/migrations.js"), "utf8")}\nglobalThis.migrate = migrateStorageSnapshot;`, context);
+  vm.runInContext(`${readFileSync(path.resolve("js/plan-window-core.js"), "utf8")}\n${readFileSync(path.resolve("js/p0-final-core.js"), "utf8")}\n${readFileSync(path.resolve("js/p0-results.js"), "utf8")}\n${readFileSync(path.resolve("js/migrations.js"), "utf8")}\nglobalThis.migrate = migrateStorageSnapshot;`, context);
   return context;
 }
 
@@ -45,7 +45,7 @@ test("real backup migrates in memory with plan and focus invariants", () => {
   const templates = JSON.parse(first.values.studyPlanPhaseTemplates);
   const backups = JSON.parse(first.values.studyPlanMigrationBackups);
 
-  assert.equal(first.values.appDataSchemaVersion, "7.2");
+  assert.equal(first.values.appDataSchemaVersion, "7.3");
   assert.equal(Object.keys(migratedPlans).length, 10);
   assert.equal(migratedPlans["2026-07-18"].currentTaskId, originalPlans["2026-07-18"].currentTaskId);
   assert.deepEqual(

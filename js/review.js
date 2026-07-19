@@ -9,7 +9,12 @@ function writeHistory(history) {
 }
 
 function loadReviewFields() {
-  autoSaveFields.forEach((field) => { field.value = localStorage.getItem(field.dataset.save) || field.value || ""; });
+  const todayRecord = readHistory().find((record) => record && record.date === getDateKey()) || {};
+  const mappings = {
+    "completed-today": "completedToday", "unfinished-today": "unfinishedToday", "delayed-tasks": "delayedTasks",
+    "learned-today": "learnedToday", "tomorrow-priority": "tomorrowPriority",
+  };
+  document.querySelectorAll("[data-review-field]").forEach((field) => { field.value = String(todayRecord[mappings[field.dataset.reviewField]] || ""); });
   renderTodayFocusOutputs();
 }
 
@@ -34,13 +39,11 @@ function renderTodayFocusOutputs() {
 }
 
 function bindReviewAutoSaving() {
-  autoSaveFields.forEach((field) => field.addEventListener("input", () => {
-    localStorage.setItem(field.dataset.save, field.value);
-  }));
+  // P0 final: closeout drafts become formal only when the daily record is saved.
 }
 
 function getReviewField(key) {
-  const field = document.querySelector(`[data-save="${key}"]`);
+  const field = document.querySelector(`[data-review-field="${key}"]`);
   return field ? field.value.trim() : "";
 }
 
@@ -69,6 +72,7 @@ function saveTodayReview() {
   const studyTime = getStudyTimeSnapshot();
   const reviewSnapshot = typeof getReviewSnapshot === "function" ? getReviewSnapshot() : { completed: [], dueNextDay: [] };
   const record = {
+    recordSchemaVersion: 2,
     date: getDateKey(),
     displayDate: getDisplayDate(),
     completionRate: rate,
@@ -107,6 +111,7 @@ function saveTodayReview() {
   renderHistory();
   renderRecentSevenDays();
   renderExamStatsOverview();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   setStatus("#reviewSaveStatus", "今日学习记录已更新；同一天不会重复生成记录。");
 }
 

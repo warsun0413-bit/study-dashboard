@@ -19,16 +19,33 @@
   </header>
 
   <main class="dashboard">
-    <section class="panel exam-stats-panel" aria-labelledby="examStatsTitle">
+    <section class="panel home-order-1" aria-labelledby="phaseOverviewTitle">
+      <p class="step">当前阶段</p><h2 id="phaseOverviewTitle"><span id="currentPhaseName">未配置</span></h2>
+      <div class="phase-overview-grid">
+        <div><span>阶段日期</span><strong id="currentPhaseDates">未配置</strong><small id="currentPhaseRemaining">不显示虚构倒计时</small></div>
+        <div><span>下一阶段</span><strong id="nextPhaseName">未配置</strong></div>
+        <div><span>下一关键里程碑</span><strong id="nextMilestone">未配置</strong></div>
+      </div>
+    </section>
+
+    <section class="panel home-order-2" aria-labelledby="topPriorityTitle">
+      <p class="step">今日最高优先级</p><h2 id="topPriorityTitle">先处理这三项</h2>
+      <div id="topPriorityList" class="priority-list"></div>
+    </section>
+
+    <details class="panel exam-stats-panel home-order-10 low-frequency-panel">
+      <summary><span><span class="step">低频统计</span><strong id="examStatsTitle">考研累计学习概览</strong></span></summary>
+      <div class="low-frequency-body">
       <div class="section-heading">
-        <div><p class="step">考研累计学习概览</p><h2 id="examStatsTitle">从计划开始到今天</h2></div>
+        <div><h2>从计划开始到今天</h2></div>
         <div class="exam-stats-total"><span>累计学习总时长</span><strong id="examStatsTotal">0分钟</strong></div>
       </div>
       <p id="examStatsRange" class="muted exam-stats-range">统计区间：2026-07-18 至今天</p>
       <div id="examSubjectBars" class="exam-subject-bars" aria-label="各科目累计学习时长占比"></div>
-    </section>
+      </div>
+    </details>
 
-    <section class="panel" aria-labelledby="planTitle">
+    <section class="panel home-order-4" aria-labelledby="planTitle">
       <div class="section-heading">
         <div><p class="step">01 今日计划</p><h2 id="planTitle">今日时间表</h2><p id="scheduleHint" class="muted schedule-hint"></p></div>
         <div class="rate"><strong id="completionRate">0%</strong><span id="completionText">已完成 0 / 8 项</span></div>
@@ -58,7 +75,7 @@
       </details>
     </section>
 
-    <section class="panel" aria-labelledby="dueReviewsTitle">
+    <section class="panel home-order-5" aria-labelledby="dueReviewsTitle">
       <div class="section-heading">
         <div><p class="step">今日复盘</p><h2 id="dueReviewsTitle">今日到期复盘</h2></div>
         <strong id="dueReviewsCount" class="due-reviews-count">0 项</strong>
@@ -67,7 +84,7 @@
       <p id="dueReviewsStatus" class="status" aria-live="polite"></p>
     </section>
 
-    <section id="execution" class="panel" aria-labelledby="executionTitle">
+    <section id="execution" class="panel home-order-3" aria-labelledby="executionTitle">
       <div class="section-heading">
         <div><p class="step">02 当前执行</p><h2 id="executionTitle">一次只推进一个任务</h2></div>
         <button id="enterFocusModeBtn" class="button secondary" type="button">进入专注模式</button>
@@ -126,30 +143,51 @@
       <p id="executionStatus" class="status" aria-live="polite"></p>
     </section>
 
-    <section class="panel" aria-labelledby="reviewTitle">
+    <section class="panel home-order-6" aria-labelledby="factSummaryTitle">
+      <p class="step">今日事实摘要</p><h2 id="factSummaryTitle">到期、逾期与未完成</h2>
+      <div class="fact-summary-grid">
+        <a href="#dueReviewsTitle"><span>今日到期复盘</span><strong id="summaryDueToday">0</strong></a>
+        <a href="#dueReviewsTitle"><span>逾期复盘</span><strong id="summaryOverdueReviews">0</strong></a>
+        <a href="#planTitle"><span>未完成学习任务</span><strong id="summaryUnfinishedTasks">0</strong></a>
+      </div>
+      <p><strong>当前进行中：</strong><span id="summaryInProgress">无</span></p>
+      <p><strong>超过计划时间仍未完成：</strong><span id="summaryScheduleOverdue">无</span></p>
+    </section>
+
+    <section class="panel home-order-7" aria-labelledby="reviewTitle">
       <p class="step">03 今日学习记录</p><h2 id="reviewTitle">用五个问题完成今天的闭环</h2>
       <div class="field-grid two-columns">
-        <label>今天完成了什么<textarea data-save="completed-today" rows="4"></textarea></label>
-        <label>今天没完成什么<textarea data-save="unfinished-today" rows="4"></textarea></label>
-        <label>为什么没完成<textarea data-save="delayed-tasks" rows="4"></textarea></label>
-        <label>今天学到了什么<textarea data-save="learned-today" rows="4"></textarea></label>
+        <label>今天完成了什么<textarea id="reviewCompletedToday" data-review-field="completed-today" rows="4"></textarea></label>
+        <label>今天没完成什么<textarea id="reviewUnfinishedToday" data-review-field="unfinished-today" rows="4"></textarea></label>
+        <label>为什么没完成<textarea id="reviewDelayedTasks" data-review-field="delayed-tasks" rows="4"></textarea></label>
+        <label>今天学到了什么<textarea id="reviewLearnedToday" data-review-field="learned-today" rows="4"></textarea></label>
       </div>
       <div id="focusOutputsReference" class="focus-output-reference" hidden>
         <strong>今日专注产出：</strong>
         <ul id="focusOutputsList"></ul>
       </div>
-      <label class="full-field">明天第一优先级<input data-save="tomorrow-priority" placeholder="明天开始后先做什么"></label>
+      <label class="full-field">明天第一优先级<input id="reviewTomorrowPriority" data-review-field="tomorrow-priority" placeholder="明天开始后先做什么"></label>
       <div class="button-row"><button id="saveReviewBtn" class="button primary" type="button">保存今日学习记录</button><span id="reviewSaveStatus" class="status" aria-live="polite"></span></div>
     </section>
 
-    <section class="panel" aria-labelledby="historyTitle">
+    <section class="panel home-order-8" aria-labelledby="todaySnapshotTitle">
+      <p class="step">今日实际快照</p><h2 id="todaySnapshotTitle">导出或复制总控回传</h2>
+      <p class="muted">只读取正式保存的任务、专注、专业课和复盘结果；计划内容不会被当作实际完成。</p>
+      <div class="button-row">
+        <button id="exportTodaySnapshotBtn" class="button primary" type="button">导出今日快照 JSON</button>
+        <button id="copyControlMarkdownBtn" class="button secondary" type="button">复制总控回传版</button>
+        <span id="todaySnapshotStatus" class="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="panel home-order-9" aria-labelledby="historyTitle">
       <p class="step">04 最近 7 天</p><h2 id="historyTitle">学习完成情况</h2>
       <div id="recentSevenDays" class="seven-days"></div>
       <h3>历史记录</h3>
       <div id="historyList" class="history-list"></div>
     </section>
 
-    <details class="panel data-settings">
+    <details class="panel data-settings home-order-11">
       <summary><span><span class="step">05 数据设置</span><strong id="dataTitle">导出、恢复或清空学习数据</strong></span></summary>
       <div class="data-settings-body">
         <p class="muted">完整导出包含当前浏览器中的全部字段，包括网站已停止使用的旧数据。</p>
@@ -255,6 +293,7 @@
   </div>
 
   <script src="js/plan-window-core.js"></script>
+  <script src="js/p0-final-core.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/p0-results.js"></script>
   <script src="js/migrations.js"></script>
@@ -265,6 +304,7 @@
   <script src="js/exam-stats.js"></script>
   <script src="js/review.js"></script>
   <script src="js/data-safety.js"></script>
+  <script src="js/p0-final.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

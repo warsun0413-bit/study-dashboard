@@ -264,6 +264,7 @@ function renderTasks() {
   renderFocusTaskOptions();
   if (typeof renderManualStudyTaskOptions === "function") renderManualStudyTaskOptions();
   if (typeof renderProfessionalResults === "function") renderProfessionalResults();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
 }
 
 function setTaskStatus(task, status) {

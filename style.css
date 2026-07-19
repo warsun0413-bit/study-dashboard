@@ -22,6 +22,9 @@ button { cursor: pointer; }
 .site-header { padding: 40px 0 20px; }
 .site-header h1 { margin: 2px 0 4px; font-size: clamp(1.7rem, 4vw, 2.4rem); }
 .dashboard { display: grid; gap: 18px; padding-bottom: 56px; }
+.home-order-1 { order: 1; } .home-order-2 { order: 2; } .home-order-3 { order: 3; } .home-order-4 { order: 4; }
+.home-order-5 { order: 5; } .home-order-6 { order: 6; } .home-order-7 { order: 7; } .home-order-8 { order: 8; }
+.home-order-9 { order: 9; } .home-order-10 { order: 10; } .home-order-11 { order: 11; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: clamp(18px, 4vw, 28px); box-shadow: var(--shadow); }
 .panel h2 { margin: 2px 0 18px; font-size: 1.35rem; }
 .panel h3 { margin: 24px 0 10px; font-size: 1rem; }
@@ -44,6 +47,20 @@ button { cursor: pointer; }
 .exam-subject-track { height: 10px; overflow: hidden; border-radius: 999px; background: #e7ece9; }
 .exam-subject-fill { display: block; min-width: 0; height: 100%; border-radius: inherit; background: var(--subject-color, var(--primary)); transition: width .2s ease; }
 .exam-subject-value { color: var(--muted); text-align: right; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.phase-overview-grid { display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 12px; }
+.phase-overview-grid > div { display: grid; gap: 4px; padding: 14px; border-radius: 10px; background: #f8faf8; }
+.phase-overview-grid span, .phase-overview-grid small { color: var(--muted); }
+.priority-list { display: grid; gap: 9px; }
+.priority-item { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: center; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; color: inherit; text-decoration: none; }
+.priority-item > strong { color: var(--primary); font-size: 1.25rem; }
+.priority-item > span { display: grid; }
+.priority-item small { color: var(--muted); }
+.fact-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fact-summary-grid a { display: grid; gap: 4px; padding: 14px; border-radius: 10px; background: var(--primary-soft); color: inherit; text-decoration: none; }
+.fact-summary-grid strong { color: var(--primary); font-size: 1.55rem; }
+.low-frequency-panel > summary { cursor: pointer; }
+.low-frequency-body { margin-top: 18px; }
+.clipboard-fallback { position: fixed; left: -10000px; top: 0; }
 
 .field-grid { display: grid; gap: 14px; margin-top: 20px; }
 .three-things { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -198,7 +215,7 @@ textarea { resize: vertical; }
 @media (max-width: 720px) {
   .site-header, .dashboard { width: min(100% - 20px, 1040px); }
   .site-header { padding-top: 24px; }
-  .three-things, .two-columns, .execution-fields, .add-task-form, .focus-totals, .manual-time-form, .daily-target-form, .professional-result-form, .professional-results-list { grid-template-columns: 1fr; }
+  .three-things, .two-columns, .execution-fields, .add-task-form, .focus-totals, .manual-time-form, .daily-target-form, .professional-result-form, .professional-results-list, .phase-overview-grid, .fact-summary-grid { grid-template-columns: 1fr; }
   .professional-result-form .wide-field { grid-column: auto; }
   .due-review-row { grid-template-columns: 1fr; }
   .due-review-actions { grid-template-columns: 1fr 1fr; }

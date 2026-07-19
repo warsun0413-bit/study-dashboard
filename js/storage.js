@@ -1,10 +1,10 @@
-// v7.2 shared storage helpers. Existing learning records are preserved.
-const APP_VERSION = "7.2.0";
+// v7.3 shared storage helpers. Existing learning records are preserved.
+const APP_VERSION = "7.3.0";
 const historyKey = "review-history";
 const lastBackupKey = "lastBackupAt";
 const lastFullBackupKey = "lastFullBackupAt";
 const appDataSchemaVersionKey = "appDataSchemaVersion";
-const currentAppDataSchemaVersion = "7.2";
+const currentAppDataSchemaVersion = "7.3";
 const dailyPlansKey = "studyDailyPlans";
 const planPhaseTemplatesKey = "studyPlanPhaseTemplates";
 const planWindowStateKey = "studyPlanWindowState";
@@ -82,7 +82,7 @@ function ensureDataSchema() {
   }
   if (!hadStoredData && localStorage.getItem(migrationStateKey) === null) {
     writeJson(migrationStateKey, {
-      migrationId: PLAN_WINDOW_MIGRATION_ID,
+      migrationId: P0_FINAL_MIGRATION_ID,
       status: "completed",
       source: "fresh-install",
       targetVersion: currentAppDataSchemaVersion,

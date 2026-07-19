@@ -273,7 +273,7 @@ function restoreStorageValues(values) {
   const currentSnapshot = readRawStorageSnapshot();
   const restoredSnapshot = { ...currentSnapshot };
   entries.forEach(([key, value]) => { if (value !== null) restoredSnapshot[key] = value; });
-  const migrated = migrateStorageSnapshot(restoredSnapshot, { source: "backup-restore", force: true });
+  const migrated = migrateStorageSnapshot(restoredSnapshot, { source: "backup-restore", force: true, todayKey: getDateKey() });
   applyStorageSnapshotTransaction(migrated.values, "backup-restore", true);
   ensureDataSchema();
   renderTasks();
@@ -287,6 +287,7 @@ function restoreStorageValues(values) {
   renderMigrationReport();
   renderProfessionalResults();
   renderDueReviews();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   return entries.length;
 }
 
@@ -335,5 +336,6 @@ function clearLearningData() {
   renderExamStatsConfig();
   renderHistory();
   renderRecentSevenDays();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   setStatus("#backupStatus", "学习数据已清空；旧模块数据未删除。 ");
 }

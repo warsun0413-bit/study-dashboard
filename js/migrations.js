@@ -1,8 +1,8 @@
 // P0 trusted-execution migration: pure transformation, transactional apply, and guarded rollback.
-const TRUSTED_EXECUTION_MIGRATION_ID = PLAN_WINDOW_MIGRATION_ID;
+const TRUSTED_EXECUTION_MIGRATION_ID = P0_FINAL_MIGRATION_ID;
 const MIGRATION_APP_SCHEMA_KEY = typeof appDataSchemaVersionKey === "string" ? appDataSchemaVersionKey : "appDataSchemaVersion";
-const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "7.2";
-const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "7.2.0";
+const MIGRATION_CURRENT_SCHEMA_VERSION = typeof currentAppDataSchemaVersion === "string" ? currentAppDataSchemaVersion : "7.3";
+const MIGRATION_APP_VERSION = typeof APP_VERSION === "string" ? APP_VERSION : "7.3.0";
 const MIGRATION_HISTORY_KEY = typeof historyKey === "string" ? historyKey : "review-history";
 const MIGRATION_DAILY_PLANS_KEY = typeof dailyPlansKey === "string" ? dailyPlansKey : "studyDailyPlans";
 const MIGRATION_PLAN_PHASE_TEMPLATES_KEY = typeof planPhaseTemplatesKey === "string" ? planPhaseTemplatesKey : "studyPlanPhaseTemplates";
@@ -22,8 +22,18 @@ const MIGRATION_REPORTS_KEY = typeof migrationReportsKey === "string" ? migratio
 const MIGRATION_ROLLBACK_KEY = typeof migrationRollbackKey === "string" ? migrationRollbackKey : "studyMigrationRollback";
 const MIGRATION_ERROR_LOG_KEY = typeof errorLogKey === "string" ? errorLogKey : "studyErrorLog";
 const MIGRATION_UI_PREFS_KEY = typeof uiPreferencesKey === "string" ? uiPreferencesKey : "studyUiPreferences";
-const INACTIVE_LEGACY_KEYS = ["today-1", "today-2", "english-1", "major-1", "offlineAiPromptDraft"];
-const ACTIVE_LEGACY_KEYS_DEFERRED = ["completed-today", "unfinished-today", "delayed-tasks", "learned-today", "tomorrow-priority"];
+const DEPRECATED_LEGACY_FIELDS = Object.freeze({
+  "completed-today": "review-history", "unfinished-today": "review-history", "delayed-tasks": "review-history",
+  "learned-today": "review-history", "tomorrow-priority": "review-history",
+  "today-1": "studyDailyPlans", "today-2": "studyDailyPlans", "today-3": "studyDailyPlans", "today-4": "studyDailyPlans", "today-5": "studyDailyPlans", "today-6": "studyDailyPlans",
+  "english-1": "studyDailyPlans", "english-2": "studyDailyPlans", "english-3": "studyDailyPlans",
+  "major-1": "studyDailyPlans", "major-2": "studyDailyPlans", "major-3": "studyDailyPlans",
+  "daily-score": "review-history", "study-mode": "", focusModeState: "studyFocusTimerState",
+  offlineAiPromptDraft: "", offlineAiAdviceRecords: "", deepseekUsageRecords: "", supportCards: "",
+  essayRecords: "", essayCritiqueRecords: "", essayTrainingSessions: "", nankaiEssayQuestionBank: "",
+  automatedTestRecords: "", regressionTestRecords: "", commandPaletteRecords: "", frontendErrorLogs: "studyErrorLog",
+  userPreferences: "studyUiPreferences", collapsedSections: "studyUiPreferences",
+});
 const KNOWN_ERROR_LOG_KEYS = [MIGRATION_ERROR_LOG_KEY, "errorLogs", "errorLog", "errors", "appErrors", "systemErrorLogs"];
 const DEFAULT_TRUSTED_UI_PREFERENCES = {
   hideLowFrequencyModules: true,
@@ -82,22 +92,16 @@ function getMigrationCounts(values) {
 }
 
 function getLatestActualDate(values) {
-  const dates = [];
-  const addDate = (value) => { if (/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) dates.push(value); };
-  const history = parseStoredJson(values[MIGRATION_HISTORY_KEY], []);
-  if (Array.isArray(history)) history.forEach((record) => addDate(record && record.date));
-  const focusTotals = normalizeDateTotals(parseStoredJson(values[MIGRATION_FOCUS_TOTALS_KEY], {}));
-  Object.entries(focusTotals).forEach(([date, seconds]) => { if (seconds > 0) addDate(date); });
-  const manual = parseStoredJson(values[MIGRATION_MANUAL_TIME_KEY], []);
-  if (Array.isArray(manual)) manual.forEach((record) => { if (Number(record && record.durationSeconds) > 0) addDate(record.date); });
-  const sessions = parseStoredJson(values[MIGRATION_FOCUS_SESSIONS_KEY], []);
-  if (Array.isArray(sessions)) sessions.forEach((session) => { if (Number(session && session.seconds) > 0) addDate(session.date); });
-  const plans = parseStoredJson(values[MIGRATION_DAILY_PLANS_KEY], {});
-  if (isStoredObject(plans)) Object.entries(plans).forEach(([date, plan]) => {
-    const tasks = plan && Array.isArray(plan.tasks) ? plan.tasks : [];
-    if (tasks.some((task) => task && (task.completed === true || ["in-progress", "completed", "skipped"].includes(task.status)))) addDate(date);
+  return getLatestP0FormalActivityDate({
+    history: parseStoredJson(values[MIGRATION_HISTORY_KEY], []),
+    focusTotals: parseStoredJson(values[MIGRATION_FOCUS_TOTALS_KEY], {}),
+    taskFocusTotals: parseStoredJson(values[MIGRATION_TASK_FOCUS_TOTALS_KEY], {}),
+    manualRecords: parseStoredJson(values[MIGRATION_MANUAL_TIME_KEY], []),
+    focusSessions: parseStoredJson(values[MIGRATION_FOCUS_SESSIONS_KEY], []),
+    professionalStore: parseStoredJson(values[MIGRATION_PRO_RESULTS_KEY], {}),
+    reviewQueue: parseStoredJson(values[MIGRATION_REVIEW_QUEUE_KEY], []),
+    dailyPlans: parseStoredJson(values[MIGRATION_DAILY_PLANS_KEY], {}),
   });
-  return dates.sort().at(-1) || "";
 }
 
 function migrateStorageSnapshot(snapshot, options = {}) {
@@ -144,21 +148,42 @@ function migrateStorageSnapshot(snapshot, options = {}) {
   safeLegacy.schemaVersion = 1;
   safeLegacy.fields = isStoredObject(safeLegacy.fields) ? safeLegacy.fields : {};
   safeLegacy.migrations = Array.isArray(safeLegacy.migrations) ? safeLegacy.migrations : [];
+  safeLegacy.migratedAt = safeLegacy.migratedAt || now;
   const archivedKeys = [];
-  INACTIVE_LEGACY_KEYS.forEach((key) => {
+  Object.entries(DEPRECATED_LEGACY_FIELDS).forEach(([key, replacedBy]) => {
     if (!Object.prototype.hasOwnProperty.call(values, key)) return;
     if (!Object.prototype.hasOwnProperty.call(safeLegacy.fields, key)) {
-      safeLegacy.fields[key] = { value: values[key], archivedAt: now, reason: "inactive-legacy-field" };
+      safeLegacy.fields[key] = { value: values[key], status: "deprecated", replacedBy, migratedAt: now };
+    } else {
+      safeLegacy.fields[key] = {
+        ...safeLegacy.fields[key],
+        status: "deprecated",
+        replacedBy: Object.prototype.hasOwnProperty.call(safeLegacy.fields[key], "replacedBy") ? safeLegacy.fields[key].replacedBy : replacedBy,
+        migratedAt: safeLegacy.fields[key].migratedAt || safeLegacy.fields[key].archivedAt || now,
+      };
     }
     delete values[key];
     archivedKeys.push(key);
   });
+  Object.entries(DEPRECATED_LEGACY_FIELDS).forEach(([key, replacedBy]) => {
+    if (!Object.prototype.hasOwnProperty.call(safeLegacy.fields, key)) return;
+    safeLegacy.fields[key] = {
+      ...safeLegacy.fields[key],
+      status: "deprecated",
+      replacedBy: safeLegacy.fields[key].replacedBy || replacedBy,
+      migratedAt: safeLegacy.fields[key].migratedAt || safeLegacy.fields[key].archivedAt || now,
+    };
+  });
 
   const previousLastActiveDate = values.lastActiveDate || "";
+  if (Object.prototype.hasOwnProperty.call(values, "lastActiveDate") && !safeLegacy.fields.lastActiveDate) {
+    safeLegacy.fields.lastActiveDate = { value: values.lastActiveDate, status: "deprecated", replacedBy: "derived-from-formal-records", migratedAt: now };
+  }
   const latestActualDate = getLatestActualDate(values);
   if (latestActualDate) values.lastActiveDate = latestActualDate;
-  if (previousLastActiveDate && previousLastActiveDate !== latestActualDate) {
-    safeLegacy.migrations.push({ key: "lastActiveDate", previousValue: previousLastActiveDate, migratedAt: now });
+  else delete values.lastActiveDate;
+  if (previousLastActiveDate !== latestActualDate && !safeLegacy.migrations.some((entry) => entry && entry.migrationId === P0_FINAL_MIGRATION_ID && entry.key === "lastActiveDate")) {
+    safeLegacy.migrations.push({ migrationId: P0_FINAL_MIGRATION_ID, key: "lastActiveDate", previousValue: previousLastActiveDate, derivedValue: latestActualDate, migratedAt: now });
   }
 
   const rawSessions = requireArrayOrDefault(MIGRATION_FOCUS_SESSIONS_KEY);
@@ -221,7 +246,7 @@ function migrateStorageSnapshot(snapshot, options = {}) {
     beforeCounts,
     afterCounts: null,
     archivedKeys,
-    deferredActiveLegacyKeys: ACTIVE_LEGACY_KEYS_DEFERRED.filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
+    deferredActiveLegacyKeys: [],
     observedZeroFocusSessions,
     planWindow: planWindowMigration.window,
     detailedPlansArchived: Object.keys(planWindowMigration.archivedFarPlans).length,

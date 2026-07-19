@@ -6,7 +6,7 @@ import { legacyStorageFixture } from "./fixtures/legacy-backup-fixture.mjs";
 const context = {
   console,
   appDataSchemaVersionKey: "appDataSchemaVersion",
-  currentAppDataSchemaVersion: "7.2",
+  currentAppDataSchemaVersion: "7.3",
   historyKey: "review-history",
   dailyPlansKey: "studyDailyPlans",
   planPhaseTemplatesKey: "studyPlanPhaseTemplates",
@@ -27,6 +27,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(`${fs.readFileSync(new URL("../js/plan-window-core.js", import.meta.url), "utf8")}
+${fs.readFileSync(new URL("../js/p0-final-core.js", import.meta.url), "utf8")}
 ${fs.readFileSync(new URL("../js/p0-results.js", import.meta.url), "utf8")}
 ${fs.readFileSync(new URL("../js/migrations.js", import.meta.url), "utf8")}
 globalThis.runFixtureMigration = (snapshot, options) => migrateStorageSnapshot(snapshot, options);
@@ -34,10 +35,12 @@ globalThis.buildFixtureChanges = (before, after) => buildStorageChanges(before, 
 globalThis.applyFixtureTransaction = (snapshot, operationId) => applyStorageSnapshotTransaction(snapshot, operationId, false);`, context);
 
 const first = context.runFixtureMigration(legacyStorageFixture, { now: "2026-07-18T12:00:00.000Z", todayKey: "2026-07-18", source: "test" });
-assert.equal(first.values.appDataSchemaVersion, "7.2");
+assert.equal(first.values.appDataSchemaVersion, "7.3");
 assert.equal(Object.prototype.hasOwnProperty.call(first.values, "today-1"), false);
 assert.equal(Object.prototype.hasOwnProperty.call(first.values, "offlineAiPromptDraft"), false);
-assert.equal(first.values["completed-today"], "仍由当前版本读取");
+assert.equal(Object.prototype.hasOwnProperty.call(first.values, "completed-today"), false);
+assert.equal(JSON.parse(first.values.legacyBackup).fields["completed-today"].value, "仍由当前版本读取");
+assert.equal(JSON.parse(first.values.legacyBackup).fields["completed-today"].status, "deprecated");
 assert.equal(JSON.parse(first.values.legacyBackup).fields["today-1"].value, "done");
 assert.equal(JSON.parse(first.values.studyFocusSessions).length, 2);
 assert.equal(first.values.studyFocusSessions, legacyStorageFixture.studyFocusSessions);

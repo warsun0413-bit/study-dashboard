@@ -361,6 +361,7 @@ function saveProfessionalUnit() {
   clearProfessionalForm();
   renderProfessionalResults();
   renderDueReviews();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   setStatus("#professionalResultStatus", `${input.subject} 知识单元结果已保存；复盘层级已按 reviewKey 去重。`);
 }
 
@@ -442,14 +443,14 @@ function handleDueReviewClick(event) {
     const code = document.querySelector(`[data-review-result="${id}"]`).value;
     const outcome = applyReviewResult(readJson(reviewQueueKey, []), id, code, getDateKey());
     if (!outcome.changed) return setStatus("#dueReviewsStatus", outcome.message, true);
-    writeJson(reviewQueueKey, outcome.records); renderDueReviews(); setStatus("#dueReviewsStatus", outcome.message); return;
+    writeJson(reviewQueueKey, outcome.records); renderDueReviews(); if (typeof renderP0FinalHome === "function") renderP0FinalHome(); setStatus("#dueReviewsStatus", outcome.message); return;
   }
   if (move) {
     const id = move.dataset.reviewReschedule;
     const dueDate = document.querySelector(`[data-review-date="${id}"]`).value;
     const outcome = rescheduleReview(readJson(reviewQueueKey, []), id, dueDate);
     if (!outcome.changed) return setStatus("#dueReviewsStatus", "请选择有效日期。", true);
-    writeJson(reviewQueueKey, outcome.records); renderDueReviews(); setStatus("#dueReviewsStatus", "已更新原复盘任务的日期，没有创建重复任务。");
+    writeJson(reviewQueueKey, outcome.records); renderDueReviews(); if (typeof renderP0FinalHome === "function") renderP0FinalHome(); setStatus("#dueReviewsStatus", "已更新原复盘任务的日期，没有创建重复任务。");
   }
 }
 
