@@ -3,6 +3,7 @@ const REVIEW_LEVEL_OFFSETS = Object.freeze({ D0: 0, D1: 1, D3: 3, D7: 7, D14: 14
 const REVIEW_LEVELS = Object.freeze(Object.keys(REVIEW_LEVEL_OFFSETS));
 const REVIEW_RESULTS = Object.freeze({ passed: "通过", partial: "部分通过", failed: "未通过", unverified: "未验收" });
 const REVIEW_STATUSES = new Set(["pending", "completed", "rescheduled", "cancelled"]);
+const REVIEW_TYPES = new Set(["spaced", "short-retest", "output-rewrite", "option-trap", "politics-knowledge"]);
 const MASTERY_LEVELS = new Set(["L0", "L1", "L2", "L3", "L4", "L5"]);
 
 function resultText(value, limit = 240) {
@@ -44,6 +45,11 @@ function normalizeReviewRecord(record, index = 0) {
   const knowledgeUnitId = resultText(source.knowledgeUnitId, 100);
   const reviewLevel = REVIEW_LEVELS.includes(source.reviewLevel) || source.reviewLevel === "short-retest" ? source.reviewLevel : "D0";
   const reviewKey = resultText(source.reviewKey, 180) || buildReviewKey(subject, knowledgeUnitId, reviewLevel);
+  const reviewType = REVIEW_TYPES.has(source.reviewType) ? source.reviewType : reviewLevel === "short-retest" ? "short-retest" : "spaced";
+  const sourceRecordId = resultText(source.sourceRecordId, 140);
+  const sourceRecordType = resultText(source.sourceRecordType, 60);
+  const businessKey = resultText(source.businessKey, 240)
+    || (reviewType === "spaced" || reviewType === "short-retest" ? reviewKey : `${subject}:${sourceRecordId}:${reviewType}:${knowledgeUnitId}`);
   return {
     ...source,
     reviewId: resultText(source.reviewId, 120) || `legacy-review-${index}-${reviewKey}`,
@@ -52,6 +58,10 @@ function normalizeReviewRecord(record, index = 0) {
     knowledgeUnitId,
     knowledgeUnit: resultText(source.knowledgeUnit, 160),
     reviewLevel,
+    reviewType,
+    sourceRecordId,
+    sourceRecordType,
+    businessKey,
     dueDate: isDateKey(source.dueDate) ? source.dueDate : "",
     task: resultText(source.task, 240),
     previousResult: Object.values(REVIEW_RESULTS).includes(source.previousResult) ? source.previousResult : "未验收",
@@ -67,8 +77,9 @@ function normalizeReviewQueueRecords(records) {
   const normalized = records.map(normalizeReviewRecord);
   const groups = new Map();
   normalized.forEach((record) => {
-    if (!groups.has(record.reviewKey)) groups.set(record.reviewKey, []);
-    groups.get(record.reviewKey).push(record);
+    const key = record.businessKey || record.reviewKey;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(record);
   });
   const statusRank = { pending: 4, completed: 3, rescheduled: 2, cancelled: 1 };
   groups.forEach((items) => {
@@ -86,8 +97,8 @@ function normalizeReviewQueueRecords(records) {
 function upsertReviewRecord(queue, input, now = new Date().toISOString()) {
   const records = normalizeReviewQueueRecords(queue);
   const patch = normalizeReviewRecord({ ...input, updatedAt: now });
-  let current = records.find((record) => record.reviewKey === patch.reviewKey && record.status !== "cancelled");
-  if (!current) current = records.find((record) => record.reviewKey === patch.reviewKey);
+  let current = records.find((record) => record.businessKey === patch.businessKey && record.status !== "cancelled");
+  if (!current) current = records.find((record) => record.businessKey === patch.businessKey);
   if (current) {
     const reviewId = current.reviewId;
     Object.assign(current, patch, { reviewId, duplicateOf: undefined, updatedAt: now });
@@ -114,6 +125,7 @@ function ensureReviewSchedule(queue, unit, studyDate, now = new Date().toISOStri
       knowledgeUnitId: unit.unitId,
       knowledgeUnit: unit.name,
       reviewLevel,
+      reviewType: "spaced",
       dueDate: addDateDays(studyDate, REVIEW_LEVEL_OFFSETS[reviewLevel]),
       task: `复述并验收：${unit.name}`,
       previousResult: "未验收",
@@ -166,6 +178,9 @@ function applyReviewResult(queue, reviewId, resultCode, today, now = new Date().
   current.status = "completed";
   current.completedAt = now;
   current.completedDate = today;
+  if (!["spaced", "short-retest"].includes(current.reviewType)) {
+    return { records, changed: true, message: "业务复盘任务已完成，不会生成间隔复盘层级。" };
+  }
   if (resultCode === "passed") {
     records = ensureNextReview(records, current, now);
     return { records, changed: true, message: "本层已通过，后续复盘任务已保留。" };
@@ -178,6 +193,7 @@ function applyReviewResult(queue, reviewId, resultCode, today, now = new Date().
       knowledgeUnitId: current.knowledgeUnitId,
       knowledgeUnit: current.knowledgeUnit,
       reviewLevel: "short-retest",
+      reviewType: "short-retest",
       dueDate: addDateDays(today, 1),
       dueAt: new Date(new Date(now).getTime() + 24 * 60 * 60 * 1000).toISOString(),
       task: `短时重测：${current.knowledgeUnit}`,

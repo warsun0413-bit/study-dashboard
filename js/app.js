@@ -14,6 +14,7 @@ function initApp() {
   initExamStats();
   initP0Final();
   initP1Results();
+  initP1Output();
   renderHistory();
   renderRecentSevenDays();
 

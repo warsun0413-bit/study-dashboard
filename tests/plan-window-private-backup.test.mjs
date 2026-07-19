@@ -15,7 +15,7 @@ const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex").toU
 function makeMigrationContext() {
   const context = vm.createContext({
     console, Date,
-    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.0", APP_VERSION: "8.0.0",
+    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.1", APP_VERSION: "8.1.0",
     historyKey: "review-history", dailyPlansKey: "studyDailyPlans",
     planPhaseTemplatesKey: "studyPlanPhaseTemplates", planWindowStateKey: "studyPlanWindowState", planMigrationBackupsKey: "studyPlanMigrationBackups",
     focusMinutesKey: "studyFocusSeconds", taskFocusSecondsKey: "studyTaskFocusSeconds", focusSessionsKey: "studyFocusSessions",
@@ -45,7 +45,7 @@ test("real backup migrates in memory with plan and focus invariants", () => {
   const templates = JSON.parse(first.values.studyPlanPhaseTemplates);
   const backups = JSON.parse(first.values.studyPlanMigrationBackups);
 
-  assert.equal(first.values.appDataSchemaVersion, "8.0");
+  assert.equal(first.values.appDataSchemaVersion, "8.1");
   assert.equal(Object.keys(migratedPlans).length, 10);
   assert.equal(migratedPlans["2026-07-18"].currentTaskId, originalPlans["2026-07-18"].currentTaskId);
   assert.deepEqual(

@@ -94,6 +94,29 @@ function savePoliticsRecord(input) {
   return saveP1Record(politicsRecordsKey, input, normalizePoliticsRecord, "politics");
 }
 
+function convertPoliticsCandidate(recordId, candidateId) {
+  const records = readP1Records(politicsRecordsKey);
+  const record = records.find((item) => item.recordId === recordId);
+  const candidate = record && (record.reviewCandidates || []).find((item) => item.candidateId === candidateId);
+  if (!candidate) throw new Error("政治复盘候选不存在。");
+  if (candidate.status === "converted" && candidate.reviewId) return candidate;
+  const reviewType = ["K", "M"].includes(candidate.reasonCode) ? "politics-knowledge" : "option-trap";
+  const reviewLevel = candidate.suggestedReview === "D3" ? "D3" : candidate.suggestedReview === "D1" ? "D1" : "D0";
+  const businessKey = `politics:${record.recordId}:${reviewType}:${candidate.knowledgePointId}`;
+  const now = new Date().toISOString();
+  const outcome = upsertReviewRecord(readJson(reviewQueueKey, []), {
+    businessKey, reviewKey: businessKey, subject: "politics", knowledgeUnitId: candidate.knowledgePointId,
+    knowledgeUnit: candidate.knowledgePoint, reviewLevel, reviewType, dueDate: candidate.suggestedReview === "D3" ? addDateDays(record.date, 3) : addDateDays(record.date, 1),
+    task: `${reviewType === "option-trap" ? "选项陷阱" : "政治知识点"}：${candidate.knowledgePoint}`,
+    sourceRecordId: record.recordId, sourceRecordType: "studyPoliticsRecords", sourceTaskId: record.taskId,
+    status: "pending", previousResult: "未验收", createdAt: now,
+  }, now);
+  candidate.status = "converted"; candidate.reviewId = outcome.record.reviewId;
+  const before = readRawStorageSnapshot();
+  applyStorageSnapshotTransaction({ ...before, [politicsRecordsKey]: JSON.stringify(records), [reviewQueueKey]: JSON.stringify(outcome.records) }, "p1-convert-politics-candidate", false);
+  return candidate;
+}
+
 function p1FormatAccuracy(value) {
   return value === null ? "未记录" : `${Math.round(value * 1000) / 10}%`;
 }
@@ -124,6 +147,9 @@ function appendP1ResultSummary(task, content, controls) {
       summary.textContent = `政治：${P1_STATUS_LABELS[record.status]}｜单选 ${p1FormatAccuracy(accuracy.singleChoiceAccuracy)}｜多选 ${p1FormatAccuracy(accuracy.multipleChoiceAccuracy)}｜总计 ${p1FormatAccuracy(accuracy.totalAccuracy)}｜蒙题 ${p1FormatAccuracy(accuracy.guessedAccuracy)}｜主要错因 ${accuracy.dominantErrorCode || "未记录"}`;
     }
     controls.append(createTaskButton("编辑政治结果", "p1-politics", taskId, "ghost"));
+    if (record) (record.reviewCandidates || []).filter((candidate) => candidate.status === "candidate").forEach((candidate) => {
+      controls.append(createTaskButton(`转为复盘：${candidate.reasonCode}`, `p1-politics-convert:${record.recordId}:${candidate.candidateId}`, taskId, "ghost"));
+    });
   }
   content.appendChild(summary);
 }
@@ -217,6 +243,11 @@ function handleP1TaskAction(action, task) {
   if (action === "p1-words") { openP1ResultDialog("words", String(task.taskId || task.id)); return true; }
   if (action === "p1-reading") { openP1ResultDialog("reading", String(task.taskId || task.id)); return true; }
   if (action === "p1-politics") { openP1ResultDialog("politics", String(task.taskId || task.id)); return true; }
+  if (action.startsWith("p1-politics-convert:")) {
+    const [, , recordId, candidateId] = action.split(":");
+    try { convertPoliticsCandidate(recordId, candidateId); renderTasks(); renderDueReviews(); } catch (error) { window.alert(error.message || "转换失败。"); }
+    return true;
+  }
   return false;
 }
 

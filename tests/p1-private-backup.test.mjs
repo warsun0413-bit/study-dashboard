@@ -11,10 +11,10 @@ const hash = (buffer) => createHash("sha256").update(buffer).digest("hex").toUpp
 
 function createContext() {
   const context = vm.createContext({
-    console, Date, appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.0", APP_VERSION: "8.0.0",
+    console, Date, appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.1", APP_VERSION: "8.1.0",
     historyKey: "review-history", dailyPlansKey: "studyDailyPlans", planPhaseTemplatesKey: "studyPlanPhaseTemplates", planWindowStateKey: "studyPlanWindowState", planMigrationBackupsKey: "studyPlanMigrationBackups",
     focusMinutesKey: "studyFocusSeconds", taskFocusSecondsKey: "studyTaskFocusSeconds", focusSessionsKey: "studyFocusSessions", manualTimeRecordsKey: "studyManualTimeRecords", dailyStudyTargetsKey: "studyDailyTargetSeconds", examStatsConfigKey: "studyExamStatsConfig",
-    reviewQueueKey: "reviewQueue", professionalResultsKey: "studyProfessionalResults", englishWordRecordsKey: "studyEnglishWordRecords", englishReadingRecordsKey: "studyEnglishReadingRecords", politicsRecordsKey: "studyPoliticsRecords",
+    reviewQueueKey: "reviewQueue", professionalResultsKey: "studyProfessionalResults", englishWordRecordsKey: "studyEnglishWordRecords", englishReadingRecordsKey: "studyEnglishReadingRecords", politicsRecordsKey: "studyPoliticsRecords", outputRecordsKey: "studyOutputRecords",
     legacyBackupKey: "legacyBackup", migrationStateKey: "studyMigrationState", migrationReportsKey: "studyMigrationReports", migrationRollbackKey: "studyMigrationRollback", errorLogKey: "studyErrorLog", uiPreferencesKey: "studyUiPreferences",
   });
   vm.runInContext(`${readFileSync(path.resolve("js/plan-window-core.js"), "utf8")}\n${readFileSync(path.resolve("js/p0-final-core.js"), "utf8")}\n${readFileSync(path.resolve("js/p0-results.js"), "utf8")}\n${readFileSync(path.resolve("js/p1-results-core.js"), "utf8")}\n${readFileSync(path.resolve("js/migrations.js"), "utf8")}\nglobalThis.api={migrate:migrateStorageSnapshot};`, context);
@@ -29,10 +29,11 @@ test("real P0 backup migrates to P1 with empty result stores and all trusted inv
   const originalPlans = JSON.parse(original.studyDailyPlans);
   const context = createContext();
   const first = context.api.migrate(original, { force: true, source: "p1-private", todayKey: "2026-07-18", now: "2026-07-18T12:00:00.000Z" });
-  assert.equal(first.values.appDataSchemaVersion, "8.0");
+  assert.equal(first.values.appDataSchemaVersion, "8.1");
   assert.deepEqual(JSON.parse(first.values.studyEnglishWordRecords), []);
   assert.deepEqual(JSON.parse(first.values.studyEnglishReadingRecords), []);
   assert.deepEqual(JSON.parse(first.values.studyPoliticsRecords), []);
+  assert.deepEqual(JSON.parse(first.values.studyOutputRecords), []);
   assert.equal(Object.values(JSON.parse(first.values.studyFocusSeconds)).reduce((sum, seconds) => sum + Number(seconds || 0), 0), 60906);
   assert.equal(first.values.studyFocusSessions, original.studyFocusSessions);
   assert.equal(JSON.parse(first.values.studyFocusSessions).length, 12);

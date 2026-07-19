@@ -86,7 +86,7 @@ function createStorageContext(failWrites = false) {
   const storageContext = vm.createContext({
     console, Date,
     englishWordRecordsKey: "studyEnglishWordRecords", englishReadingRecordsKey: "studyEnglishReadingRecords", politicsRecordsKey: "studyPoliticsRecords",
-    dailyPlansKey: "studyDailyPlans",
+    dailyPlansKey: "studyDailyPlans", reviewQueueKey: "reviewQueue",
     localStorage: { getItem: (key) => values.has(key) ? values.get(key) : null, setItem: (key, value) => values.set(key, String(value)), key: (index) => [...values.keys()][index] || null, get length() { return values.size; } },
     readJson: (key, fallback) => values.has(key) ? JSON.parse(values.get(key)) : fallback,
     readRawStorageSnapshot: () => Object.fromEntries(values),
@@ -95,7 +95,7 @@ function createStorageContext(failWrites = false) {
     getTaskStatus: (task) => task.status || (task.completed ? "completed" : "not-started"),
     getDateKey: () => date,
   });
-  vm.runInContext(`${fs.readFileSync(new URL("../js/p1-results-core.js", import.meta.url), "utf8")}\n${fs.readFileSync(new URL("../js/p1-results.js", import.meta.url), "utf8")}\nglobalThis.api={saveEnglishWordRecord,saveEnglishReadingRecord,savePoliticsRecord};`, storageContext);
+  vm.runInContext(`${fs.readFileSync(new URL("../js/p1-results-core.js", import.meta.url), "utf8")}\n${fs.readFileSync(new URL("../js/p0-results.js", import.meta.url), "utf8")}\n${fs.readFileSync(new URL("../js/p1-results.js", import.meta.url), "utf8")}\nglobalThis.api={saveEnglishWordRecord,saveEnglishReadingRecord,savePoliticsRecord,convertPoliticsCandidate};`, storageContext);
   return { api: storageContext.api, values };
 }
 
@@ -122,4 +122,16 @@ test("failed result transaction leaves all storage unchanged", () => {
   const before = JSON.stringify([...storage.values.entries()]);
   assert.throws(() => storage.api.saveEnglishWordRecord({ date, taskId: "plan-english", reviewCompleted: true }), /simulated-write-failure/);
   assert.equal(JSON.stringify([...storage.values.entries()]), before);
+});
+
+test("politics candidate conversion is explicit, unique, and stores formal reviewId", () => {
+  const storage = createStorageContext();
+  const politics = storage.api.savePoliticsRecord({ date, taskId: "plan-politics", singleChoiceTotal: 5, singleChoiceCorrect: 4, weakPoints: [{ knowledgePointId: "kp", knowledgePoint: "概念", reasonCode: "K" }], status: "partial" });
+  const candidate = politics.reviewCandidates[0];
+  storage.api.convertPoliticsCandidate(politics.recordId, candidate.candidateId);
+  storage.api.convertPoliticsCandidate(politics.recordId, candidate.candidateId);
+  const reviews = JSON.parse(storage.values.get("reviewQueue"));
+  const savedCandidate = JSON.parse(storage.values.get("studyPoliticsRecords"))[0].reviewCandidates[0];
+  assert.equal(reviews.filter((item) => item.reviewType === "politics-knowledge" && item.status !== "cancelled").length, 1);
+  assert.equal(savedCandidate.status, "converted"); assert.ok(savedCandidate.reviewId);
 });

@@ -1,10 +1,10 @@
-// v8.0 shared storage helpers. Existing learning records are preserved.
-const APP_VERSION = "8.0.0";
+// v8.1 shared storage helpers. Existing learning records are preserved.
+const APP_VERSION = "8.1.0";
 const historyKey = "review-history";
 const lastBackupKey = "lastBackupAt";
 const lastFullBackupKey = "lastFullBackupAt";
 const appDataSchemaVersionKey = "appDataSchemaVersion";
-const currentAppDataSchemaVersion = "8.0";
+const currentAppDataSchemaVersion = "8.1";
 const dailyPlansKey = "studyDailyPlans";
 const planPhaseTemplatesKey = "studyPlanPhaseTemplates";
 const planWindowStateKey = "studyPlanWindowState";
@@ -24,6 +24,7 @@ const professionalResultsKey = "studyProfessionalResults";
 const englishWordRecordsKey = "studyEnglishWordRecords";
 const englishReadingRecordsKey = "studyEnglishReadingRecords";
 const politicsRecordsKey = "studyPoliticsRecords";
+const outputRecordsKey = "studyOutputRecords";
 const legacyBackupKey = "legacyBackup";
 const migrationStateKey = "studyMigrationState";
 const migrationReportsKey = "studyMigrationReports";
@@ -75,6 +76,7 @@ function ensureDataSchema() {
   if (localStorage.getItem(englishWordRecordsKey) === null) writeJson(englishWordRecordsKey, []);
   if (localStorage.getItem(englishReadingRecordsKey) === null) writeJson(englishReadingRecordsKey, []);
   if (localStorage.getItem(politicsRecordsKey) === null) writeJson(politicsRecordsKey, []);
+  if (localStorage.getItem(outputRecordsKey) === null) writeJson(outputRecordsKey, []);
   if (localStorage.getItem(errorLogKey) === null) writeJson(errorLogKey, []);
   if (localStorage.getItem(uiPreferencesKey) === null) writeJson(uiPreferencesKey, {
     hideLowFrequencyModules: true,
@@ -88,7 +90,7 @@ function ensureDataSchema() {
   }
   if (!hadStoredData && localStorage.getItem(migrationStateKey) === null) {
     writeJson(migrationStateKey, {
-      migrationId: P1_ENGLISH_POLITICS_MIGRATION_ID,
+      migrationId: P1_OUTPUT_REVIEW_MIGRATION_ID,
       status: "completed",
       source: "fresh-install",
       targetVersion: currentAppDataSchemaVersion,

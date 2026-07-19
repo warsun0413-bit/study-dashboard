@@ -278,6 +278,7 @@ function renderTasks() {
     select.value = status;
     controls.append(select, createTaskButton("设为当前任务", "focus", task.id, "secondary"), createTaskButton("编辑说明", "edit-description", task.id));
     if (typeof appendP1ResultSummary === "function") appendP1ResultSummary(task, content, controls);
+    if (typeof appendP1OutputSummary === "function") appendP1OutputSummary(task, content, controls);
     row.append(time, content, controls);
     list.appendChild(row);
   });
@@ -346,6 +347,7 @@ function handleTaskListClick(event) {
   const task = plan.tasks.find((item) => item.id === action.dataset.taskId);
   if (!task) return;
   if (typeof handleP1TaskAction === "function" && handleP1TaskAction(action.dataset.taskAction, task)) return;
+  if (typeof handleP1OutputAction === "function" && handleP1OutputAction(action.dataset.taskAction, task)) return;
   if (action.dataset.taskAction === "focus") return setCurrentTask(task.id);
   if (action.dataset.taskAction === "edit-description") {
     const description = window.prompt("今日任务说明", task.description || task.minimum || "");

@@ -13,7 +13,7 @@ const scannedLegacyKeys = [...retiredKeys, "lastActiveDate"];
 const context = {
   console,
   appDataSchemaVersionKey: "appDataSchemaVersion",
-  currentAppDataSchemaVersion: "8.0",
+  currentAppDataSchemaVersion: "8.1",
   historyKey: "review-history",
   dailyPlansKey: "studyDailyPlans",
   planPhaseTemplatesKey: "studyPlanPhaseTemplates",
@@ -42,7 +42,7 @@ globalThis.buildFixtureChanges = (before, after) => buildStorageChanges(before, 
 globalThis.applyFixtureTransaction = (snapshot, operationId) => applyStorageSnapshotTransaction(snapshot, operationId, false);`, context);
 
 const first = context.runFixtureMigration(legacyStorageFixture, { now: "2026-07-18T12:00:00.000Z", todayKey: "2026-07-18", source: "test" });
-assert.equal(first.values.appDataSchemaVersion, "8.0");
+assert.equal(first.values.appDataSchemaVersion, "8.1");
 assert.equal(Object.prototype.hasOwnProperty.call(first.values, "today-1"), false);
 assert.equal(Object.prototype.hasOwnProperty.call(first.values, "offlineAiPromptDraft"), false);
 assert.equal(Object.prototype.hasOwnProperty.call(first.values, "completed-today"), false);
