@@ -70,9 +70,17 @@ function renderP0Priorities() {
     const priorityTask = priority.type === "task" && Array.isArray(plan?.tasks)
       ? plan.tasks.find((task) => [task.id, task.taskId, task.sourceTaskKey].some((id) => String(id || "") === String(priority.targetId || "")))
       : null;
-    const executionDescription = priorityTask && typeof getTaskExecutionDescription === "function"
-      ? getTaskExecutionDescription(priorityTask)
-      : "";
+    const executionBrief = priorityTask && typeof getTaskExecutionBrief === "function"
+      ? getTaskExecutionBrief(priorityTask)
+      : null;
+    const executionDescription = executionBrief
+      ? [
+        executionBrief.startAction ? `先做：${executionBrief.startAction}` : "",
+        executionBrief.completionCriteria ? `完成：${executionBrief.completionCriteria}` : "",
+      ].filter(Boolean).join(" · ")
+      : priorityTask && typeof getTaskExecutionDescription === "function"
+        ? getTaskExecutionDescription(priorityTask)
+        : "";
     const meta = document.createElement("small");
     meta.textContent = [priority.meta, executionDescription].filter(Boolean).join(" · ");
     content.append(title, meta); link.append(rank, content); container.appendChild(link);

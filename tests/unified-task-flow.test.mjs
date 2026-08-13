@@ -15,7 +15,7 @@ assert.match(tasksSource, /function createTaskMoreActions\(/);
 assert.match(tasksSource, /function getTaskRowPrimaryCommand\(/);
 assert.match(tasksSource, /taskPrimaryCommandByButton\.set\(button, getTaskRowPrimaryCommand\(task, status, config\)\)/);
 assert.match(tasksSource, /executionSurfaceCommandsMatch\(renderedPrimaryCommand, freshCommand\)/);
-assert.match(tasksSource, /function renderTasks\(\)[\s\S]*description\.textContent = getTaskExecutionDescription\(task\)/);
+assert.match(tasksSource, /function renderTasks\(\)[\s\S]*renderTaskExecutionBrief\(brief, getTaskExecutionBrief\(task\), \{ compact: true \}\)/);
 assert.match(tasksSource, /appendP1ResultSummary\(task, content, body\)/);
 assert.match(tasksSource, /appendProfessionalTaskSummary\(task, content, body\)/);
 assert.match(tasksSource, /appendP1OutputSummary\(task, content, body\)/);

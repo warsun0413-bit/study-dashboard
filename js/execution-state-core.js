@@ -20,6 +20,57 @@ function executionSurfaceText(value) {
   return String(value == null ? "" : value).trim();
 }
 
+const EXECUTION_BRIEF_SOURCE_LABELS = Object.freeze({
+  "formal-record": "正式记录",
+  "manual-edit": "人工调整",
+  "today-plan": "今日计划",
+  "today-minimum": "今日最低动作",
+  "phase-plan": "阶段计划",
+  "safe-default": "安全保底",
+});
+
+function executionBriefText(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  return /^\[object\s+[^\]]+\]$/i.test(text) ? "" : text;
+}
+
+function selectExecutionBriefCandidate(candidates) {
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const text = executionBriefText(candidate.text);
+    if (!text) continue;
+    const source = executionBriefText(candidate.source) || "safe-default";
+    return {
+      text,
+      source,
+      sourceLabel: EXECUTION_BRIEF_SOURCE_LABELS[source] || "已有计划",
+    };
+  }
+  return { text: "", source: "", sourceLabel: "" };
+}
+
+function createTaskExecutionBrief(input = {}) {
+  const start = selectExecutionBriefCandidate(input.startCandidates);
+  const scope = selectExecutionBriefCandidate(input.scopeCandidates);
+  const completion = selectExecutionBriefCandidate(input.completionCandidates);
+  const fallback = selectExecutionBriefCandidate(input.fallbackCandidates);
+  const sourceLabels = [...new Set([start, scope, completion, fallback]
+    .map((field) => field.sourceLabel)
+    .filter(Boolean))];
+  return {
+    taskId: executionBriefText(input.taskId),
+    actionable: Boolean(start.text),
+    startAction: start.text,
+    scope: scope.text,
+    completionCriteria: completion.text,
+    fallbackAction: fallback.text,
+    fields: { start, scope, completion, fallback },
+    sourceSummary: sourceLabels.join(" + "),
+  };
+}
+
 function selectDailyGuidanceItem(items, options = {}) {
   const actionField = options.actionField === "startAction" ? "startAction" : "tomorrowAction";
   const excludeTaskId = executionSurfaceText(options.excludeTaskId);

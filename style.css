@@ -56,6 +56,7 @@ button { cursor: pointer; }
 .priority-item > span { display: grid; }
 .priority-item small { color: var(--muted); }
 .cockpit-current { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 4px; }
+.cockpit-current > div:first-child { flex: 1 1 auto; min-width: 0; }
 .cockpit-current h2 { margin-bottom: 6px; font-size: clamp(1.55rem, 4vw, 2rem); }
 .cockpit-task-meta { margin: 0; color: var(--primary); font-size: .88rem; font-weight: 750; }
 .cockpit-task-description { max-width: 690px; margin: 0; }
@@ -68,6 +69,17 @@ button { cursor: pointer; }
 .result-handoff-receipt strong { color: var(--primary); }
 .result-handoff-receipt span { color: var(--muted); font-size: .88rem; }
 .result-handoff-receipt .result-handoff-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.execution-brief { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 760px; margin-top: 14px; }
+.execution-brief[hidden] { display: none; }
+.execution-brief > div { display: grid; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfb; }
+.execution-brief > div > span { color: var(--primary); font-size: .74rem; font-weight: 750; }
+.execution-brief > div > strong { color: var(--text); font-size: .88rem; font-weight: 650; line-height: 1.5; }
+.execution-brief > small { grid-column: 1 / -1; color: var(--muted); font-size: .74rem; }
+.execution-brief.is-compact { grid-template-columns: 1fr; gap: 4px; margin-top: 7px; }
+.execution-brief.is-compact > div { grid-template-columns: 42px minmax(0, 1fr); gap: 7px; padding: 0; border: 0; background: transparent; }
+.execution-brief.is-compact > div > strong { font-size: .8rem; }
+.task-execution-brief > small { margin-top: 2px; }
+.focus-execution-brief { width: min(620px, 100%); margin: 18px auto 0; text-align: left; }
 .cockpit-metrics { display: grid; grid-template-columns: 1.35fr 1fr .75fr; gap: 10px; margin-top: 22px; }
 .cockpit-metric { display: grid; gap: 4px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: inherit; text-decoration: none; }
 .cockpit-metric > span { color: var(--muted); font-size: .82rem; }
@@ -197,6 +209,7 @@ textarea { resize: vertical; }
 .task-row > input { width: 19px; height: 19px; accent-color: var(--primary); }
 .task-row > div:nth-child(2) { display: grid; min-width: 0; }
 .task-row > div:nth-child(2) span { color: var(--muted); font-size: .82rem; }
+.task-row .execution-brief > div > span { color: var(--primary); font-size: .74rem; }
 .task-row.status-completed { background: var(--primary-soft); }
 .task-row.status-completed > div:nth-child(2) > strong { color: var(--muted); text-decoration: line-through; }
 .task-row.status-in-progress { border-color: #8fb5a3; box-shadow: inset 3px 0 var(--primary); }

@@ -487,9 +487,10 @@ function renderTasks() {
     const name = document.createElement("strong");
     const roleLabel = getTaskStudyRoleLabel(task);
     name.textContent = roleLabel ? `${task.name} · ${roleLabel}` : task.name;
-    const description = document.createElement("span");
-    description.textContent = getTaskExecutionDescription(task);
-    content.append(name, description);
+    const brief = document.createElement("div");
+    brief.className = "task-execution-brief execution-brief is-compact";
+    renderTaskExecutionBrief(brief, getTaskExecutionBrief(task), { compact: true });
+    content.append(name, brief);
     const controls = document.createElement("div");
     controls.className = "task-actions";
     const primaryButton = createUnifiedTaskPrimaryButton(task, status);
@@ -572,6 +573,11 @@ function renderResultHandoff() {
     freeButton.disabled = !model.freeFocusAvailable;
     freeButton.dataset.taskId = model.taskId;
   }
+  renderTaskExecutionBrief(
+    document.querySelector("#resultHandoffBrief"),
+    model.task ? getTaskExecutionBrief(model.task) : null,
+    { compact: true },
+  );
   syncFocusResultHandoffCard(model);
 }
 
@@ -583,6 +589,10 @@ function syncFocusResultHandoffCard(model) {
   document.querySelector("#focusResultHandoffDescription").textContent = model.task
     ? `${model.task.name} · ${getTaskExecutionDescription(model.task)}`
     : "本轮专注时间和正式结果均已保存。";
+  renderTaskExecutionBrief(
+    document.querySelector("#focusResultHandoffBrief"),
+    model.task ? getTaskExecutionBrief(model.task) : null,
+  );
   const startButton = document.querySelector("#focusResultHandoffStartBtn");
   const freeButton = document.querySelector("#focusResultHandoffFreeBtn");
   startButton.hidden = !model.command.valid;
@@ -1009,6 +1019,105 @@ function getTaskExecutionDescription(task) {
   return readTaskText(task.description, ["description", "minimumOutput", "text"])
     || readTaskText(task.minimum, ["minimumOutput", "description", "text"])
     || "暂无任务说明";
+}
+
+function getTaskExecutionBriefPhaseKey(task) {
+  const sourceKey = String(task && task.sourceTaskKey || "");
+  if (sourceKey === "originalTextOrReview") return "review";
+  if (sourceKey === "outputOrMock") return "output";
+  if (sourceKey) return sourceKey;
+  return {
+    english: "english",
+    englishReading: "english",
+    maYuan: "722",
+    maHistory: "844",
+    politics: "politics",
+    output: "output",
+    rollingReview: "review",
+    exercise: "training",
+  }[String(task && task.category || "")] || "";
+}
+
+function getTaskPhaseExecutionContext(task) {
+  if (!task || typeof getP0PhaseOverview !== "function") return {};
+  const overview = getP0PhaseOverview(readJson(planPhaseTemplatesKey, []), getDateKey());
+  const phase = overview && overview.current;
+  const key = getTaskExecutionBriefPhaseKey(task);
+  if (!phase || !key) return {};
+  const chapter = readTaskText(phase.chapterTasks && phase.chapterTasks[key], ["description", "text"]);
+  const template = readTaskText(phase.taskTemplates && phase.taskTemplates[key], ["description", "text"]);
+  return {
+    scope: [chapter, template].filter(Boolean).join("；"),
+    completionCriteria: readTaskText(phase.completionCriteria && phase.completionCriteria[key], ["completionCriteria", "minimumOutput", "description"]),
+  };
+}
+
+function getTaskExecutionBrief(task) {
+  if (!task || typeof createTaskExecutionBrief !== "function") return null;
+  const startContext = getTaskStartContext(task);
+  const phase = getTaskPhaseExecutionContext(task);
+  const todaySource = task.manualEdited === true ? "manual-edit" : "today-plan";
+  const startSource = startContext && startContext.source || "safe-default";
+  return createTaskExecutionBrief({
+    taskId: task.id || task.taskId,
+    startCandidates: [
+      { text: startContext && startContext.action, source: startSource },
+      { text: getFiveMinuteStartAction(task), source: "safe-default" },
+    ],
+    scopeCandidates: [
+      {
+        text: readTaskText(task.description, ["description", "minimumOutput", "text"])
+          || readTaskText(task.minimum, ["minimumOutput", "description", "text"]),
+        source: todaySource,
+      },
+      { text: phase.scope, source: "phase-plan" },
+    ],
+    completionCandidates: [
+      {
+        text: readTaskText(task.completionCriteria, ["completionCriteria", "minimumOutput", "description"])
+          || readTaskText(task.minimumOutput, ["minimumOutput", "completionCriteria", "description"]),
+        source: todaySource,
+      },
+      { text: phase.completionCriteria, source: "phase-plan" },
+      { text: "保存真实完成内容、未完成点和下一准确起点。", source: "safe-default" },
+    ],
+    fallbackCandidates: [
+      {
+        text: readTaskText(task.fallbackPlan, ["fallback", "description", "text"])
+          || readTaskText(task.fallback, ["fallback", "description", "text"]),
+        source: todaySource,
+      },
+      { text: "时间不足时保留真实未完成状态，只记录已完成部分和下一准确起点。", source: "safe-default" },
+    ],
+  });
+}
+
+function renderTaskExecutionBrief(container, brief, options = {}) {
+  if (!container) return false;
+  container.replaceChildren();
+  if (!brief || !brief.actionable) {
+    container.hidden = true;
+    return false;
+  }
+  const fields = options.compact === true
+    ? [["先做", brief.startAction], ["完成", brief.completionCriteria]]
+    : [["现在先做", brief.startAction], ["任务范围", brief.scope], ["完成标准", brief.completionCriteria], ["时间不足", brief.fallbackAction]];
+  fields.filter(([, value]) => value).forEach(([label, value]) => {
+    const row = document.createElement("div");
+    const key = document.createElement("span");
+    const text = document.createElement("strong");
+    key.textContent = label;
+    text.textContent = value;
+    row.append(key, text);
+    container.appendChild(row);
+  });
+  if (brief.sourceSummary) {
+    const source = document.createElement("small");
+    source.textContent = `依据：${brief.sourceSummary}`;
+    container.appendChild(source);
+  }
+  container.hidden = false;
+  return true;
 }
 
 function getFiveMinuteStartAction(task) {
@@ -1672,6 +1781,7 @@ function syncFocusModeContent() {
     ? `${task.time ? `${task.time} · ` : ""}${task.name}`
     : select && select.value === "__unassigned__" ? "未归属专注" : "尚未选择任务";
   document.querySelector("#focusModeOutput").textContent = task ? getTaskExecutionDescription(task) : "";
+  renderTaskExecutionBrief(document.querySelector("#focusModeExecutionBrief"), task ? getTaskExecutionBrief(task) : null);
   syncFiveMinuteStartupUi();
   renderExecutionSurface();
 }
@@ -2194,6 +2304,7 @@ function applyExecutionTaskPreview(task, description = "") {
   if (focusOutput) focusOutput.value = text;
   if (focusModeTask) focusModeTask.textContent = `${task.time ? `${task.time} · ` : ""}${task.name}`;
   if (focusModeOutput) focusModeOutput.textContent = text;
+  renderTaskExecutionBrief(document.querySelector("#focusModeExecutionBrief"), getTaskExecutionBrief(task));
 }
 
 function applyExecutionSurfaceDecorations(mode, context) {
@@ -2270,6 +2381,8 @@ function renderExecutionSurface() {
   resetExecutionSurfaceLayers(snapshot.plan);
   applyExecutionSurfaceDecorations(snapshot.mode, snapshot);
   applyExecutionSurfaceView(snapshot.view);
+  const displayedTask = snapshot.plan.tasks.find((task) => task && task.id === snapshot.view.taskId) || null;
+  renderTaskExecutionBrief(document.querySelector("#cockpitExecutionBrief"), displayedTask ? getTaskExecutionBrief(displayedTask) : null);
   syncCockpitFreeFocusButton(snapshot);
   activeExecutionSurfaceSnapshot = snapshot;
   return snapshot;

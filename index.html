@@ -7,7 +7,7 @@
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=focus-result-handoff-v140">
+  <link rel="stylesheet" href="style.css?v=execution-brief-v141">
 </head>
 <body>
   <header class="site-header">
@@ -91,6 +91,7 @@
           <p id="cockpitTaskMeta" class="cockpit-task-meta">正在选择今日任务</p>
           <h2 id="executionTitle">现在开始一项正式任务</h2>
           <p id="cockpitTaskDescription" class="muted">网站会按照当前任务和时间块给出一个明确入口。</p>
+          <div id="cockpitExecutionBrief" class="execution-brief" hidden></div>
         </div>
         <div class="cockpit-focus-actions">
           <button id="enterFocusModeBtn" class="button primary cockpit-primary-action" type="button">先做5分钟</button>
@@ -101,6 +102,7 @@
         <div>
           <strong id="resultHandoffTitle">结果已保存</strong>
           <span id="resultHandoffNext"></span>
+          <div id="resultHandoffBrief" class="execution-brief is-compact" hidden></div>
         </div>
         <div class="result-handoff-actions">
           <button id="startResultHandoffNextBtn" class="button primary" type="button">先做下一项5分钟</button>
@@ -491,6 +493,7 @@
       <p class="step">专注模式</p><h2 id="focusModeTitle">当前只做这一件事</h2>
       <p id="focusModeTask" class="focus-task">尚未选择任务</p>
       <p id="focusModeOutput" class="focus-description muted"></p>
+      <div id="focusModeExecutionBrief" class="execution-brief focus-execution-brief" hidden></div>
       <label class="focus-round-goal">本轮目标<input id="focusModeGoalInput" maxlength="120" placeholder="写下这一轮要完成的具体结果"></label>
       <div class="focus-mode-selector focus-overlay-selector" aria-label="专注模式计时选择">
         <button id="focusModeFreeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
@@ -566,6 +569,7 @@
       <h2 id="focusResultHandoffTitle">正式结果已进入今日记录</h2>
       <p id="focusResultHandoffNext" class="focus-result-handoff-next"></p>
       <p id="focusResultHandoffDescription" class="focus-description muted"></p>
+      <div id="focusResultHandoffBrief" class="execution-brief focus-execution-brief" hidden></div>
       <div class="focus-result-handoff-actions">
         <button id="focusResultHandoffStartBtn" class="button primary" type="button">先做下一项5分钟</button>
         <button id="focusResultHandoffFreeBtn" class="button secondary" type="button" hidden>下一项自由专注</button>
@@ -575,7 +579,7 @@
     </section>
   </div>
 
-  <script src="js/execution-state-core.js?v=focus-result-handoff-v140"></script>
+  <script src="js/execution-state-core.js?v=execution-brief-v141"></script>
   <script src="js/plan-window-core.js?v=time-window-first-v134"></script>
   <script src="js/ai-tomorrow-plan-core.js?v=focus-result-handoff-v140"></script>
   <script src="js/ai-rolling-week-plan-core.js?v=capacity-evidence-v132"></script>
@@ -590,7 +594,7 @@
   <script src="js/migrations.js?v=ai-plan-calibration-v92"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=background-focus-v118"></script>
-  <script src="js/tasks.js?v=focus-result-handoff-v140"></script>
+  <script src="js/tasks.js?v=execution-brief-v141"></script>
   <script src="js/study-time.js?v=target-truth-v133"></script>
   <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
@@ -601,7 +605,7 @@
   <script src="js/p1-output.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration.js?v=ai-plan-calibration-v92"></script>
   <script src="js/progress-runner.js?v=execution-target-v126"></script>
-  <script src="js/p0-final.js?v=guidance-truth-v129"></script>
+  <script src="js/p0-final.js?v=execution-brief-v141"></script>
   <script src="js/app.js?v=admission-joint-v114"></script>
 </body>
 </html>

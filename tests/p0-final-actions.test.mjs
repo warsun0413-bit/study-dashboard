@@ -162,9 +162,11 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
+  assert.match(indexSource, /js\/tasks\.js\?v=execution-brief-v141/);
+  assert.match(indexSource, /js\/p0-final\.js\?v=execution-brief-v141/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=execution-brief-v141/);
+  assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=execution-brief-v141/);
 });
 
 test("all takeover builders return views instead of writing cockpit fields", () => {
@@ -244,9 +246,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(indexSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
+  assert.match(indexSource, /js\/tasks\.js\?v=execution-brief-v141/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=execution-brief-v141/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -334,11 +336,12 @@ test("output breakpoints fail closed instead of crossing 722 and 844", () => {
   assert.doesNotMatch(tasksSource, /task\.category === "output"[^}]*records = readOutputRecords\(\);/);
 });
 
-test("timetable and next-task preview reuse the same execution description", () => {
-  assert.match(tasksSource, /function renderTasks\(\)[\s\S]*description\.textContent = getTaskExecutionDescription\(task\)/);
-  assert.match(source, /const priorityTask = priority\.type === "task"[\s\S]*getTaskExecutionDescription\(priorityTask\)/);
+test("timetable and next-task preview reuse the shared execution brief", () => {
+  assert.match(tasksSource, /function renderTasks\(\)[\s\S]*renderTaskExecutionBrief\(brief, getTaskExecutionBrief\(task\), \{ compact: true \}\)/);
+  assert.match(tasksSource, /function getTaskExecutionBrief\(task\)[\s\S]*getTaskStartContext\(task\)[\s\S]*createTaskExecutionBrief\(/);
+  assert.match(source, /const priorityTask = priority\.type === "task"[\s\S]*getTaskExecutionBrief\(priorityTask\)[\s\S]*executionBrief\.startAction[\s\S]*executionBrief\.completionCriteria/);
   assert.match(source, /meta\.textContent = \[priority\.meta, executionDescription\]\.filter\(Boolean\)\.join\(" · "\)/);
-  assert.doesNotMatch(source, /getTaskExecutionDescription\(priorityTask\)[\s\S]*writeJson|saveTodayPlan|startPomodoro/);
+  assert.doesNotMatch(source, /getTaskExecutionBrief\(priorityTask\)[\s\S]*writeJson|saveTodayPlan|startPomodoro/);
 });
 
 test("successful formal results return one transient receipt and prepare the next task without auto-start", () => {
@@ -418,6 +421,29 @@ test("legacy structured task text stays readable across execution and review sna
   assert.match(reviewSource, /function readReviewTaskText\(value, preferredFields = \[\]\)/);
   assert.match(reviewSource, /description: readReviewTaskText\(task\.description \|\| task\.minimum/);
   assert.doesNotMatch(tasksSource.slice(tasksSource.indexOf("function getTaskExecutionDescription"), tasksSource.indexOf("function getFiveMinuteStartAction")), /String\(task\.(?:description|minimum)/);
+});
+
+test("one read-only execution brief supplies the cockpit timetable focus and result handoff", () => {
+  assert.match(executionStateSource, /function createTaskExecutionBrief\(input = \{\}\)/);
+  assert.match(tasksSource, /function getTaskExecutionBrief\(task\)[\s\S]*getTaskPhaseExecutionContext\(task\)[\s\S]*createTaskExecutionBrief\(/);
+  assert.match(tasksSource, /completionCandidates:[\s\S]*phase\.completionCriteria[\s\S]*保存真实完成内容、未完成点和下一准确起点/);
+  assert.match(tasksSource, /fallbackCandidates:[\s\S]*时间不足时保留真实未完成状态/);
+  assert.match(indexSource, /id="cockpitExecutionBrief"/);
+  assert.match(indexSource, /id="resultHandoffBrief"/);
+  assert.match(indexSource, /id="focusModeExecutionBrief"/);
+  assert.match(indexSource, /id="focusResultHandoffBrief"/);
+  assert.match(indexSource, /style\.css\?v=execution-brief-v141/);
+  assert.match(indexSource, /js\/execution-state-core\.js\?v=execution-brief-v141/);
+  assert.match(indexSource, /js\/tasks\.js\?v=execution-brief-v141/);
+  assert.match(serviceWorkerSource, /study-dashboard-execution-brief-v141/);
+  assert.match(serviceWorkerSource, /style\.css\?v=execution-brief-v141/);
+  assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=execution-brief-v141/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=execution-brief-v141/);
+  assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
+  assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
+  assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
+  const briefSource = tasksSource.slice(tasksSource.indexOf("function getTaskExecutionBrief"), tasksSource.indexOf("function getFiveMinuteStartAction"));
+  assert.doesNotMatch(briefSource, /writeJson|saveTodayPlan|localStorage\.setItem|sessionStorage\.setItem/);
 });
 
 test("focus completion cannot bypass tracked English or politics results", () => {

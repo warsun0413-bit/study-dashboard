@@ -5,17 +5,55 @@ import vm from "node:vm";
 
 const source = readFileSync(new URL("../js/execution-state-core.js", import.meta.url), "utf8");
 const context = vm.createContext({});
-vm.runInContext(`${source}\nglobalThis.core = { EXECUTION_SURFACE_MODES, deriveExecutionSurfaceMode, selectDailyGuidanceItem, createExecutionSurfaceView, createExecutionSurfaceCommand, executionSurfaceCommandsMatch, createResultHandoffModel, resultHandoffModelsMatch };`, context);
+vm.runInContext(`${source}\nglobalThis.core = { EXECUTION_SURFACE_MODES, deriveExecutionSurfaceMode, selectDailyGuidanceItem, createTaskExecutionBrief, createExecutionSurfaceView, createExecutionSurfaceCommand, executionSurfaceCommandsMatch, createResultHandoffModel, resultHandoffModelsMatch };`, context);
 const {
   EXECUTION_SURFACE_MODES: MODES,
   deriveExecutionSurfaceMode,
   selectDailyGuidanceItem,
+  createTaskExecutionBrief,
   createExecutionSurfaceView,
   createExecutionSurfaceCommand,
   executionSurfaceCommandsMatch,
   createResultHandoffModel,
   resultHandoffModelsMatch,
 } = context.core;
+
+test("task execution brief selects each field independently without mutating sources", () => {
+  const input = {
+    taskId: "plan-722",
+    startCandidates: [
+      { text: "", source: "today-plan" },
+      { text: "核对真理与价值部分", source: "formal-record" },
+      { text: "打开教材", source: "safe-default" },
+    ],
+    scopeCandidates: [{ text: "第五章当前知识块", source: "phase-plan" }],
+    completionCandidates: [{ text: "保存闭卷结构和准确停点", source: "phase-plan" }],
+    fallbackCandidates: [{ text: "记录已完成部分和下一起点", source: "safe-default" }],
+  };
+  const before = JSON.stringify(input);
+  const brief = createTaskExecutionBrief(input);
+  assert.equal(brief.taskId, "plan-722");
+  assert.equal(brief.startAction, "核对真理与价值部分");
+  assert.equal(brief.scope, "第五章当前知识块");
+  assert.equal(brief.completionCriteria, "保存闭卷结构和准确停点");
+  assert.equal(brief.fallbackAction, "记录已完成部分和下一起点");
+  assert.equal(brief.sourceSummary, "正式记录 + 阶段计划 + 安全保底");
+  assert.equal(JSON.stringify(input), before);
+});
+
+test("task execution brief rejects structured placeholders and fails closed", () => {
+  const brief = createTaskExecutionBrief({
+    taskId: "plan-english",
+    startCandidates: [{ text: "[object Object]", source: "today-plan" }],
+    scopeCandidates: [{ text: { description: "不能隐式转字符串" }, source: "today-plan" }],
+    completionCandidates: [],
+    fallbackCandidates: [],
+  });
+  assert.equal(brief.actionable, false);
+  assert.equal(brief.startAction, "");
+  assert.equal(brief.scope, "");
+  assert.equal(brief.sourceSummary, "");
+});
 
 test("daily guidance selects one stable incomplete formal candidate", () => {
   const items = [
