@@ -98,6 +98,7 @@ let pendingStartupSession = null;
 let activeExecutionSurfaceSnapshot = null;
 let activeResultHandoffModel = null;
 const taskPrimaryCommandByButton = new WeakMap();
+const taskFreeFocusCommandByButton = new WeakMap();
 
 function readSafeguardModeState() {
   try {
@@ -364,6 +365,24 @@ function createUnifiedTaskPrimaryButton(task, status) {
   return button;
 }
 
+function canTaskRowStartFreeFocus(task, status = getTaskStatus(task)) {
+  const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
+  return Boolean(task
+    && status === "not-started"
+    && task.category !== "rollingReview"
+    && isCountedLearningTask(task)
+    && !hasPendingRound);
+}
+
+function createTaskRowFreeFocusButton(task, status) {
+  if (!canTaskRowStartFreeFocus(task, status)) return null;
+  const config = { label: "自由专注", action: "unified-start", className: "secondary" };
+  const button = createTaskButton(config.label, config.action, task.id, config.className);
+  button.classList.add("task-free-focus-action");
+  taskFreeFocusCommandByButton.set(button, getTaskRowPrimaryCommand(task, status, config));
+  return button;
+}
+
 function getTaskRowPrimaryCommand(task, status = getTaskStatus(task), config = getUnifiedTaskPrimary(task, status)) {
   return createExecutionSurfaceCommand(createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.DEFAULT,
@@ -463,7 +482,11 @@ function renderTasks() {
     content.append(name, description);
     const controls = document.createElement("div");
     controls.className = "task-actions";
-    controls.append(createUnifiedTaskPrimaryButton(task, status), createTaskMoreActions(task, status, content));
+    const primaryButton = createUnifiedTaskPrimaryButton(task, status);
+    const freeFocusButton = createTaskRowFreeFocusButton(task, status);
+    controls.append(primaryButton);
+    if (freeFocusButton) controls.append(freeFocusButton);
+    controls.append(createTaskMoreActions(task, status, content));
     row.append(time, content, controls);
     if (!isCountedLearningTask(task) && !task.exercise) lifeRows.push(row);
     else learningRows.appendChild(row);
@@ -648,11 +671,27 @@ function handleTaskListClick(event) {
   const action = event.target.closest("[data-task-action]");
   if (!action) return;
   const renderedPrimaryCommand = taskPrimaryCommandByButton.get(action) || null;
+  const renderedFreeFocusCommand = taskFreeFocusCommandByButton.get(action) || null;
   const plan = getTodayPlan();
-  const taskId = renderedPrimaryCommand?.taskId || action.dataset.taskId;
+  const taskId = renderedPrimaryCommand?.taskId || renderedFreeFocusCommand?.taskId || action.dataset.taskId;
   const task = plan.tasks.find((item) => item.id === taskId);
   if (!task) {
-    if (renderedPrimaryCommand) renderTasks();
+    if (renderedPrimaryCommand || renderedFreeFocusCommand) renderTasks();
+    return;
+  }
+  if (renderedFreeFocusCommand) {
+    const status = getTaskStatus(task);
+    const freshFreeFocusCommand = getTaskRowPrimaryCommand(task, status, { label: "自由专注", action: "unified-start", className: "secondary" });
+    if (!canTaskRowStartFreeFocus(task, status)
+      || !executionSurfaceCommandsMatch(renderedFreeFocusCommand, freshFreeFocusCommand)) {
+      renderTasks();
+      setStatus("#executionStatus", "任务状态已更新，请确认后再点击。", true);
+      return;
+    }
+    setCurrentTask(task.id);
+    startImmersiveFocus(task, { directFree: true });
+    const exactAction = getTaskExactStartAction(task);
+    if (pomodoroTimerId && exactAction) syncFocusRoundGoal(exactAction);
     return;
   }
   if (renderedPrimaryCommand) {
@@ -2079,8 +2118,32 @@ function renderExecutionSurface() {
   resetExecutionSurfaceLayers(snapshot.plan);
   applyExecutionSurfaceDecorations(snapshot.mode, snapshot);
   applyExecutionSurfaceView(snapshot.view);
+  syncCockpitFreeFocusButton(snapshot);
   activeExecutionSurfaceSnapshot = snapshot;
   return snapshot;
+}
+
+function canStartCockpitFreeFocus(snapshot) {
+  const command = snapshot && snapshot.command;
+  const view = snapshot && snapshot.view;
+  if (!command || command.valid !== true || !view || !view.taskId) return false;
+  const task = snapshot.plan && snapshot.plan.tasks.find((item) => item && item.id === view.taskId);
+  const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
+  const startCommand = command.kind === "handoff"
+    || (command.kind === "task" && command.taskAction === "unified-start");
+  return Boolean(task
+    && startCommand
+    && !hasPendingRound
+    && getTaskStatus(task) === "not-started"
+    && isCountedLearningTask(task));
+}
+
+function syncCockpitFreeFocusButton(snapshot) {
+  const button = document.querySelector("#startFreeFocusBtn");
+  if (!button) return;
+  const available = canStartCockpitFreeFocus(snapshot);
+  button.hidden = !available;
+  button.disabled = !available;
 }
 
 function startDailyHandoff(model) {
@@ -2121,6 +2184,22 @@ function handleCockpitPrimaryAction() {
     return false;
   }
   return executeExecutionSurfaceCommand(freshSnapshot);
+}
+
+function handleCockpitFreeFocusAction() {
+  const freshSnapshot = getExecutionSurfaceSnapshot();
+  if (!executionSurfaceCommandsMatch(activeExecutionSurfaceSnapshot?.command, freshSnapshot.command)
+    || !canStartCockpitFreeFocus(freshSnapshot)) {
+    renderExecutionSurface();
+    setStatus("#executionStatus", "任务状态已更新，请确认后再点击。", true);
+    return false;
+  }
+  const task = freshSnapshot.plan.tasks.find((item) => item.id === freshSnapshot.view.taskId);
+  setCurrentTask(task.id);
+  startImmersiveFocus(task, { directFree: true });
+  const exactAction = freshSnapshot.handoffModel?.action || getTaskExactStartAction(task);
+  if (pomodoroTimerId && exactAction) syncFocusRoundGoal(exactAction);
+  return Boolean(pomodoroTimerId);
 }
 
 function syncFocusRoundGoal(value) {
@@ -2257,9 +2336,11 @@ function enterFocusMode() {
   document.body.classList.add("focus-mode-active");
 }
 
-function startImmersiveFocus(task) {
+function startImmersiveFocus(task, options = {}) {
   const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
-  if (task && getTaskStatus(task) === "not-started" && isCountedLearningTask(task) && !hasPendingRound) {
+  if (options.directFree === true && !hasPendingRound) {
+    setFocusTimingMode(FREE_FOCUS_MODE);
+  } else if (task && getTaskStatus(task) === "not-started" && isCountedLearningTask(task) && !hasPendingRound) {
     prepareFiveMinuteStartup(task);
   }
   startPomodoro();
@@ -2308,6 +2389,7 @@ function bindTaskControls() {
   document.querySelector("#resetPomodoroBtn").addEventListener("click", finishOrResetFocus);
   document.querySelector("#completeCurrentTaskBtn").addEventListener("click", completeCurrentTask);
   document.querySelector("#enterFocusModeBtn").addEventListener("click", handleCockpitPrimaryAction);
+  document.querySelector("#startFreeFocusBtn").addEventListener("click", handleCockpitFreeFocusAction);
   document.querySelector("#enterSafeguardModeBtn").addEventListener("click", enterSafeguardMode);
   document.querySelector("#toggleSafeguardModeBtn").addEventListener("click", exitSafeguardMode);
   document.querySelector("#dismissDailyHandoffBtn").addEventListener("click", dismissDailyHandoff);

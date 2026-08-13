@@ -59,7 +59,9 @@ button { cursor: pointer; }
 .cockpit-current h2 { margin-bottom: 6px; font-size: clamp(1.55rem, 4vw, 2rem); }
 .cockpit-task-meta { margin: 0; color: var(--primary); font-size: .88rem; font-weight: 750; }
 .cockpit-task-description { max-width: 690px; margin: 0; }
+.cockpit-focus-actions { display: grid; flex: 0 0 auto; gap: 8px; min-width: 160px; }
 .cockpit-primary-action { min-width: 160px; padding: 12px 18px; font-size: 1rem; }
+.cockpit-free-focus-action { min-width: 160px; }
 .result-handoff-receipt { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 16px; padding: 13px 15px; border: 1px solid #9abdab; border-radius: 10px; background: var(--primary-soft); }
 .result-handoff-receipt[hidden] { display: none; }
 .result-handoff-receipt > div { display: grid; gap: 3px; }
@@ -205,6 +207,7 @@ textarea { resize: vertical; }
 .task-status-select { width: auto; min-width: 96px; padding: 6px 8px; font-size: .8rem; }
 .task-action { padding: 5px 8px; font-size: .78rem; }
 .task-primary-action { min-width: 112px; padding: 9px 12px; font-size: .84rem; }
+.task-free-focus-action { padding: 7px 10px; font-size: .78rem; }
 .task-more-actions { position: relative; }
 .task-more-actions > summary { padding: 6px 8px; color: var(--muted); cursor: pointer; font-size: .76rem; font-weight: 700; list-style: none; }
 .task-more-actions > summary::-webkit-details-marker { display: none; }
@@ -480,7 +483,9 @@ textarea { resize: vertical; }
   .task-row { grid-template-columns: 1fr; }
   .task-actions { justify-content: flex-start; }
   .cockpit-current { align-items: stretch; flex-direction: column; }
+  .cockpit-focus-actions { width: 100%; }
   .cockpit-primary-action { width: 100%; }
+  .cockpit-free-focus-action { width: 100%; }
   .result-handoff-receipt { align-items: stretch; flex-direction: column; }
   .result-handoff-receipt .result-handoff-actions { width: 100%; }
   .cockpit-metrics { grid-template-columns: 1fr; }
@@ -506,6 +511,7 @@ textarea { resize: vertical; }
   .daily-ai-review-heading { align-items: flex-start; flex-direction: column; }
   .ai-tomorrow-plan-item-heading { align-items: flex-start; flex-direction: column; }
   .task-primary-action { width: 100%; }
+  .task-free-focus-action { width: 100%; }
   .task-more-actions { width: 100%; }
   .task-more-actions-body { justify-content: flex-start; min-width: 0; }
   .section-heading, .pomodoro, .focus-mode-selector { align-items: stretch; flex-direction: column; }

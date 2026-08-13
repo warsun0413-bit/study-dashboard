@@ -74,6 +74,7 @@ test("redundant cumulative statistics are removed without removing data safety t
 
 test("the primary immersive entry starts a five-minute round in one click", () => {
   assert.match(indexSource, /id="enterFocusModeBtn"[^>]*>先做5分钟<\/button>/);
+  assert.match(indexSource, /id="startFreeFocusBtn"[^>]*>直接自由专注<\/button>/);
   assert.match(tasksSource, /const FIVE_MINUTE_START_SECONDS = 5 \* 60/);
   assert.match(tasksSource, /prepareFiveMinuteStartup\(task\)/);
   assert.match(tasksSource, /startImmersiveFocus\(task\)/);
@@ -84,6 +85,14 @@ test("the primary immersive entry starts a five-minute round in one click", () =
   const handlerBlock = tasksSource.slice(tasksSource.indexOf("function handleCockpitPrimaryAction"), tasksSource.indexOf("function syncFocusRoundGoal"));
   assert.doesNotMatch(handlerBlock, /dataset\./);
   assert.match(tasksSource, /#enterFocusModeBtn"\)\.addEventListener\("click", handleCockpitPrimaryAction\)/);
+});
+
+test("a not-started cockpit task can bypass the five-minute startup only through the explicit free-focus entry", () => {
+  assert.match(tasksSource, /function canStartCockpitFreeFocus\(snapshot\)[\s\S]*getTaskStatus\(task\) === "not-started"[\s\S]*isCountedLearningTask\(task\)/);
+  assert.match(tasksSource, /function syncCockpitFreeFocusButton\(snapshot\)[\s\S]*button\.hidden = !available[\s\S]*button\.disabled = !available/);
+  assert.match(tasksSource, /function handleCockpitFreeFocusAction\(\)[\s\S]*executionSurfaceCommandsMatch\(activeExecutionSurfaceSnapshot\?\.command, freshSnapshot\.command\)[\s\S]*startImmersiveFocus\(task, \{ directFree: true \}\)/);
+  assert.match(tasksSource, /function startImmersiveFocus\(task, options = \{\}\)[\s\S]*options\.directFree === true[\s\S]*setFocusTimingMode\(FREE_FOCUS_MODE\)[\s\S]*else if[\s\S]*prepareFiveMinuteStartup\(task\)/);
+  assert.match(tasksSource, /#startFreeFocusBtn"\)\.addEventListener\("click", handleCockpitFreeFocusAction\)/);
 });
 
 test("the rendered execution snapshot is the only cockpit action source", () => {
@@ -101,8 +110,16 @@ test("task-row primary actions use the same stale-command protection as the cock
   assert.match(tasksSource, /function getTaskRowPrimaryCommand\(task, status = getTaskStatus\(task\), config = getUnifiedTaskPrimary\(task, status\)\)/);
   assert.match(tasksSource, /taskPrimaryCommandByButton\.set\(button, getTaskRowPrimaryCommand\(task, status, config\)\)/);
   assert.match(tasksSource, /const renderedPrimaryCommand = taskPrimaryCommandByButton\.get\(action\) \|\| null/);
-  assert.match(tasksSource, /const taskId = renderedPrimaryCommand\?\.taskId \|\| action\.dataset\.taskId/);
+  assert.match(tasksSource, /const taskId = renderedPrimaryCommand\?\.taskId \|\| renderedFreeFocusCommand\?\.taskId \|\| action\.dataset\.taskId/);
   assert.match(tasksSource, /const freshCommand = getTaskRowPrimaryCommand\(task\);[\s\S]*executionSurfaceCommandsMatch\(renderedPrimaryCommand, freshCommand\)[\s\S]*performUnifiedTaskAction\(task, freshCommand\.taskAction\)/);
+});
+
+test("not-started formal task rows expose a guarded free-focus shortcut without affecting review or active rounds", () => {
+  assert.match(tasksSource, /const taskFreeFocusCommandByButton = new WeakMap\(\)/);
+  assert.match(tasksSource, /function canTaskRowStartFreeFocus\(task, status = getTaskStatus\(task\)\)[\s\S]*status === "not-started"[\s\S]*task\.category !== "rollingReview"[\s\S]*isCountedLearningTask\(task\)[\s\S]*!hasPendingRound/);
+  assert.match(tasksSource, /function createTaskRowFreeFocusButton\(task, status\)[\s\S]*label: "自由专注"[\s\S]*taskFreeFocusCommandByButton\.set\(button, getTaskRowPrimaryCommand\(task, status, config\)\)/);
+  assert.match(tasksSource, /const freeFocusButton = createTaskRowFreeFocusButton\(task, status\)[\s\S]*if \(freeFocusButton\) controls\.append\(freeFocusButton\)/);
+  assert.match(tasksSource, /const renderedFreeFocusCommand = taskFreeFocusCommandByButton\.get\(action\) \|\| null[\s\S]*freshFreeFocusCommand[\s\S]*executionSurfaceCommandsMatch\(renderedFreeFocusCommand, freshFreeFocusCommand\)[\s\S]*startImmersiveFocus\(task, \{ directFree: true \}\)/);
 });
 
 test("the cockpit takes over one overdue formal-result gap without new stored state", () => {
@@ -145,9 +162,9 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=time-window-first-v134/);
+  assert.match(indexSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=time-window-first-v134/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
 });
 
 test("all takeover builders return views instead of writing cockpit fields", () => {
@@ -227,9 +244,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(indexSource, /js\/tasks\.js\?v=time-window-first-v134/);
+  assert.match(indexSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=time-window-first-v134/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);

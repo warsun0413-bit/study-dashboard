@@ -7,7 +7,7 @@
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=admission-joint-v114">
+  <link rel="stylesheet" href="style.css?v=task-row-free-focus-v136">
 </head>
 <body>
   <header class="site-header">
@@ -92,7 +92,10 @@
           <h2 id="executionTitle">现在开始一项正式任务</h2>
           <p id="cockpitTaskDescription" class="muted">网站会按照当前任务和时间块给出一个明确入口。</p>
         </div>
-        <button id="enterFocusModeBtn" class="button primary cockpit-primary-action" type="button">先做5分钟</button>
+        <div class="cockpit-focus-actions">
+          <button id="enterFocusModeBtn" class="button primary cockpit-primary-action" type="button">先做5分钟</button>
+          <button id="startFreeFocusBtn" class="button secondary cockpit-free-focus-action" type="button" hidden>直接自由专注</button>
+        </div>
       </div>
       <div id="resultHandoffReceipt" class="result-handoff-receipt" hidden>
         <div>
@@ -574,7 +577,7 @@
   <script src="js/migrations.js?v=ai-plan-calibration-v92"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=background-focus-v118"></script>
-  <script src="js/tasks.js?v=time-window-first-v134"></script>
+  <script src="js/tasks.js?v=task-row-free-focus-v136"></script>
   <script src="js/study-time.js?v=target-truth-v133"></script>
   <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
