@@ -14,6 +14,23 @@ const AI_TRUSTED_PLAN_SOURCES = Object.freeze({
   "nankai-ai-rolling-week-plan": { schemaVersion: 1, label: "AI滚动7日计划", dynamicPlanId: true },
 });
 
+function readAiPlanTaskText(value, preferredFields = []) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return /^\[object\s+[^\]]+\]$/i.test(text) ? "" : text;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) return value.map((item) => readAiPlanTaskText(item, preferredFields)).filter(Boolean).join("；");
+  if (!value || typeof value !== "object") return "";
+  const fields = [...new Set([...preferredFields, "nextStart", "action", "description", "minimumOutput", "text", "label"])];
+  for (const field of fields) {
+    const fieldValue = value[field];
+    if (typeof fieldValue === "string" && fieldValue.trim()) return fieldValue.trim();
+    if (typeof fieldValue === "number" && Number.isFinite(fieldValue)) return String(fieldValue);
+  }
+  return "";
+}
+
 function getAiPlanTaskSourceKey(task) {
   const explicit = String(task && task.sourceTaskKey || "").trim();
   if (AI_TOMORROW_PLAN_SOURCE_KEYS.includes(explicit)) return explicit;
@@ -47,12 +64,12 @@ function getAiTomorrowAvailableTasks(plan) {
     return [{
       taskId: String(task.taskId || task.id || ""),
       sourceTaskKey,
-      name: String(task.name || task.subject || sourceTaskKey),
-      time: String(task.time || ""),
-      description: String(task.description || ""),
-      nextStart: String(task.nextStart || ""),
-      completionCriteria: String(task.completionCriteria || task.minimum || ""),
-      fallback: String(task.fallbackPlan || task.fallback || ""),
+      name: readAiPlanTaskText(task.name || task.subject || sourceTaskKey),
+      time: readAiPlanTaskText(task.time),
+      description: readAiPlanTaskText(task.description, ["description", "minimumOutput", "text"]),
+      nextStart: readAiPlanTaskText(task.nextStart, ["nextStart", "action", "description"]),
+      completionCriteria: readAiPlanTaskText(task.completionCriteria || task.minimum, ["completionCriteria", "minimumOutput", "description"]),
+      fallback: readAiPlanTaskText(task.fallbackPlan || task.fallback, ["fallback", "description", "text"]),
       counted: task.counted === true,
       exercise: task.exercise === true,
       category: String(task.category || ""),
@@ -74,13 +91,13 @@ function buildAiTomorrowTaskCandidates(tomorrowPlan, todayRecord = {}) {
     };
     const todayTask = todayTasks.find((task) => getAiPlanTaskSourceKey(task) === available.sourceTaskKey);
     const todayCompleted = todayTask && (todayTask.completed === true || String(todayTask.status || "") === "completed");
-    const carryoverDescription = String(todayTask && (todayTask.description || todayTask.minimum) || "").trim();
+    const carryoverDescription = readAiPlanTaskText(todayTask && (todayTask.description || todayTask.minimum), ["description", "minimumOutput", "text"]);
     const carryover = todayTask && !todayCompleted && carryoverDescription ? {
       basis: "today-carryover",
       description: carryoverDescription,
-      nextStart: String(todayTask.nextStart || carryoverDescription).trim(),
-      completionCriteria: String(todayTask.completionCriteria || todayTask.minimum || carryoverDescription).trim(),
-      fallback: String(todayTask.fallbackPlan || "时间不足时保留真实未完成状态，并记录下一准确起点。").trim(),
+      nextStart: readAiPlanTaskText(todayTask.nextStart || carryoverDescription, ["nextStart", "action", "description"]),
+      completionCriteria: readAiPlanTaskText(todayTask.completionCriteria || todayTask.minimum || carryoverDescription, ["completionCriteria", "minimumOutput", "description"]),
+      fallback: readAiPlanTaskText(todayTask.fallbackPlan || "时间不足时保留真实未完成状态，并记录下一准确起点。", ["fallback", "description", "text"]),
     } : null;
     const protectedTask = available.protected === true;
     return {
@@ -278,8 +295,8 @@ function summarizeAiPlanExecution(record = {}) {
       plannedMinutes: range ? range.minutes : 0,
       trackedFocusSeconds: focusSeconds,
       executionState: completed ? "completed" : started ? "started-without-completion" : "not-started",
-      nextStart: String(task.nextStart || ""),
-      completionCriteria: String(task.completionCriteria || ""),
+      nextStart: readAiPlanTaskText(task.nextStart, ["nextStart", "action", "description"]),
+      completionCriteria: readAiPlanTaskText(task.completionCriteria, ["completionCriteria", "minimumOutput", "description"]),
     };
   });
   return {

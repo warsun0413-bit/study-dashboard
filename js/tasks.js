@@ -95,6 +95,7 @@ let lastFocusActivityAt = Date.now();
 let lastFinalizedFocusSession = null;
 let pendingFocusWrapup = null;
 let pendingStartupSession = null;
+let pendingFocusResultSession = null;
 let activeExecutionSurfaceSnapshot = null;
 let activeResultHandoffModel = null;
 const taskPrimaryCommandByButton = new WeakMap();
@@ -267,7 +268,16 @@ function getTaskStudyRoleLabel(task) {
     "main-output": "主科输出",
     "spaced-review": "间隔复习",
   };
-  return labels[String(task && task.studyRole || "")] || "";
+  const rawRole = task && task.studyRole;
+  const roleKey = typeof rawRole === "string"
+    ? rawRole.trim()
+    : rawRole && typeof rawRole === "object"
+      ? ["key", "role", "id", "value", "type"].map((field) => rawRole[field]).find((value) => typeof value === "string" && value.trim()) || ""
+      : "";
+  if (labels[roleKey]) return labels[roleKey];
+  return rawRole && typeof rawRole === "object" && typeof rawRole.label === "string"
+    ? rawRole.label.trim()
+    : "";
 }
 
 function updateCompletionRate() {
@@ -546,6 +556,7 @@ function renderResultHandoff() {
   const title = document.querySelector("#resultHandoffTitle");
   const next = document.querySelector("#resultHandoffNext");
   const startButton = document.querySelector("#startResultHandoffNextBtn");
+  const freeButton = document.querySelector("#startResultHandoffFreeBtn");
   if (!receipt || !title || !next || !startButton) return;
   const model = getResultHandoffModel();
   activeResultHandoffModel = model;
@@ -556,6 +567,65 @@ function renderResultHandoff() {
   startButton.disabled = !model.command.valid;
   startButton.dataset.taskId = model.command.taskId;
   startButton.textContent = model.buttonLabel;
+  if (freeButton) {
+    freeButton.hidden = !model.freeFocusAvailable;
+    freeButton.disabled = !model.freeFocusAvailable;
+    freeButton.dataset.taskId = model.taskId;
+  }
+  syncFocusResultHandoffCard(model);
+}
+
+function syncFocusResultHandoffCard(model) {
+  const card = document.querySelector("#focusResultHandoffCard");
+  if (!card) return;
+  document.querySelector("#focusResultHandoffTitle").textContent = model.title || "本轮结果已保存";
+  document.querySelector("#focusResultHandoffNext").textContent = model.nextText || "今天的正式任务已完成，可以稍后检查记录。";
+  document.querySelector("#focusResultHandoffDescription").textContent = model.task
+    ? `${model.task.name} · ${getTaskExecutionDescription(model.task)}`
+    : "本轮专注时间和正式结果均已保存。";
+  const startButton = document.querySelector("#focusResultHandoffStartBtn");
+  const freeButton = document.querySelector("#focusResultHandoffFreeBtn");
+  startButton.hidden = !model.command.valid;
+  startButton.disabled = !model.command.valid;
+  startButton.textContent = model.buttonLabel || "继续下一项";
+  freeButton.hidden = !model.freeFocusAvailable;
+  freeButton.disabled = !model.freeFocusAvailable;
+}
+
+function showFocusResultHandoffCard(model = activeResultHandoffModel) {
+  if (!model || !model.visible) return false;
+  syncFocusResultHandoffCard(model);
+  document.querySelector("#focusMainCard").hidden = true;
+  document.querySelector("#focusRecoveryCard").hidden = true;
+  document.querySelector("#focusStartupChoiceCard").hidden = true;
+  document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = false;
+  document.querySelector("#focusModeOverlay").hidden = false;
+  document.body.classList.add("focus-mode-active");
+  setStatus("#focusResultHandoffStatus", "");
+  return true;
+}
+
+function hideFocusResultHandoffCard() {
+  const card = document.querySelector("#focusResultHandoffCard");
+  if (!card || card.hidden) return false;
+  card.hidden = true;
+  document.querySelector("#focusModeOverlay").hidden = true;
+  document.body.classList.remove("focus-mode-active");
+  document.querySelector("#focusMainCard").hidden = false;
+  return true;
+}
+
+function completePendingFocusResultSession(model) {
+  const pending = pendingFocusResultSession;
+  if (!pending || !resultHandoffReceipt || pending.taskId !== resultHandoffReceipt.taskId) return false;
+  const completed = resultHandoffReceipt.savedLabel.replace(/^已保存[:：]?\s*/, "") || "正式结果已保存";
+  const nextStep = model && model.task ? getTaskExactStartAction(model.task) : "";
+  updateFocusSessionWrapup(pending.sessionId, completed, nextStep);
+  pendingFocusResultSession = null;
+  renderTodayFocusOutputs();
+  renderHistory();
+  return true;
 }
 
 function showResultHandoff(taskId, savedLabel) {
@@ -569,6 +639,10 @@ function showResultHandoff(taskId, savedLabel) {
     savedLabel: String(savedLabel || `已保存：${savedTask.name}`),
   };
   renderResultHandoff();
+  if (completePendingFocusResultSession(activeResultHandoffModel)) {
+    showFocusResultHandoffCard(activeResultHandoffModel);
+    return true;
+  }
   const nextText = document.querySelector("#resultHandoffNext")?.textContent || "";
   setStatus("#executionStatus", `${resultHandoffReceipt.savedLabel}；${nextText}`);
   document.querySelector("#execution")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -577,8 +651,16 @@ function showResultHandoff(taskId, savedLabel) {
 }
 
 function dismissResultHandoff() {
+  hideFocusResultHandoffCard();
+  pendingFocusResultSession = null;
   resultHandoffReceipt = null;
   renderResultHandoff();
+}
+
+function setResultHandoffStaleStatus() {
+  const message = "下一任务状态已更新，请确认后再点击。";
+  setStatus("#executionStatus", message, true);
+  setStatus("#focusResultHandoffStatus", message, true);
 }
 
 function startResultHandoffNext() {
@@ -586,11 +668,30 @@ function startResultHandoffNext() {
   if (!resultHandoffModelsMatch(activeResultHandoffModel, freshModel)) {
     renderExecutionSurface();
     renderResultHandoff();
-    setStatus("#executionStatus", "下一任务状态已更新，请确认后再点击。", true);
+    setResultHandoffStaleStatus();
     return false;
   }
   dismissResultHandoff();
   return executeExecutionSurfaceCommand(freshModel.executionSnapshot);
+}
+
+function startResultHandoffFreeFocus() {
+  const freshModel = getResultHandoffModel(getExecutionSurfaceSnapshot());
+  if (!resultHandoffModelsMatch(activeResultHandoffModel, freshModel)
+    || !freshModel.freeFocusAvailable
+    || !freshModel.task) {
+    renderExecutionSurface();
+    renderResultHandoff();
+    setResultHandoffStaleStatus();
+    return false;
+  }
+  const task = freshModel.task;
+  dismissResultHandoff();
+  setCurrentTask(task.id);
+  startImmersiveFocus(task, { directFree: true });
+  const exactAction = getTaskExactStartAction(task);
+  if (pomodoroTimerId && exactAction) syncFocusRoundGoal(exactAction);
+  return Boolean(pomodoroTimerId);
 }
 
 function setTaskStatus(task, status) {
@@ -713,7 +814,9 @@ function handleTaskListClick(event) {
   }
   if (action.dataset.taskAction === "focus") return setCurrentTask(task.id);
   if (action.dataset.taskAction === "edit-description") {
-    const description = window.prompt("今日任务说明", task.description || task.minimum || "");
+    const description = window.prompt("今日任务说明",
+      readTaskText(task.description, ["description", "minimumOutput", "text"])
+      || readTaskText(task.minimum, ["minimumOutput", "description", "text"]));
     if (description === null) return;
     task.description = description.trim().slice(0, 240);
     task.manualEdited = true;
@@ -820,8 +923,34 @@ function getSavedRecordedStartAction(task) {
   return getSavedRecordedStartContext(task)?.action || "";
 }
 
+function readTaskText(value, preferredFields = []) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return /^\[object\s+[^\]]+\]$/i.test(text) ? "" : text;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => readTaskText(item, preferredFields)).filter(Boolean).join("；");
+  }
+  if (!value || typeof value !== "object") return "";
+  const fields = [...new Set([
+    ...preferredFields,
+    "nextStart", "action", "description", "minimumOutput", "text", "label",
+  ])];
+  for (const field of fields) {
+    const fieldValue = value[field];
+    if (typeof fieldValue === "string" && fieldValue.trim()) return fieldValue.trim();
+    if (typeof fieldValue === "number" && Number.isFinite(fieldValue)) return String(fieldValue);
+    if (Array.isArray(fieldValue)) {
+      const text = fieldValue.map((item) => readTaskText(item)).filter(Boolean).join("；");
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
 function normalizeTaskStartAction(value) {
-  const action = String(value || "").trim();
+  const action = readTaskText(value, ["nextStart", "action", "minimumOutput", "description"]);
   return action && !/^(?:未记录|未填写|暂无|无)$/i.test(action) ? action : "";
 }
 
@@ -840,10 +969,16 @@ function getPlannedTaskStartAction(task) {
 }
 
 function getTaskStartContext(task) {
-  return getPlannedTaskStartContext(task)
-    || getSavedProfessionalStartContext(task)
-    || getSavedRecordedStartContext(task)
-    || null;
+  const contexts = [
+    getPlannedTaskStartContext(task),
+    getSavedProfessionalStartContext(task),
+    getSavedRecordedStartContext(task),
+  ];
+  for (const context of contexts) {
+    const action = normalizeTaskStartAction(context && context.action);
+    if (action) return { ...context, action };
+  }
+  return null;
 }
 
 function getTaskExactStartAction(task) {
@@ -856,18 +991,24 @@ function formatTaskStartDate(dateKey) {
 }
 
 function formatTaskStartContext(context) {
-  if (!context || !context.action) return "";
+  const action = normalizeTaskStartAction(context && context.action);
+  if (!context || !action) return "";
   if (context.source === "formal-record") {
     const date = formatTaskStartDate(context.date);
-    return `${date ? `承接 ${date} 正式记录` : "承接正式记录"}：${context.action}`;
+    return `${date ? `承接 ${date} 正式记录` : "承接正式记录"}：${action}`;
   }
-  if (context.source === "manual-edit") return `人工调整：${context.action}`;
-  return `从这里开始：${context.action}`;
+  if (context.source === "manual-edit") return `人工调整：${action}`;
+  return `从这里开始：${action}`;
 }
 
 function getTaskExecutionDescription(task) {
   const context = getTaskStartContext(task);
-  return context ? formatTaskStartContext(context) : task && (task.description || task.minimum) || "暂无任务说明";
+  const contextText = formatTaskStartContext(context);
+  if (contextText) return contextText;
+  if (!task) return "暂无任务说明";
+  return readTaskText(task.description, ["description", "minimumOutput", "text"])
+    || readTaskText(task.minimum, ["minimumOutput", "description", "text"])
+    || "暂无任务说明";
 }
 
 function getFiveMinuteStartAction(task) {
@@ -879,7 +1020,9 @@ function getFiveMinuteStartAction(task) {
   if (task.category === "english" || task.category === "englishReading") return "打开今天的真题，先完成第一题的原文定位。";
   if (task.category === "politics") return "打开当前章节，先学习5分钟或完成5道选择题。";
   if (task.category === "output") return "先闭卷写出题目的3个一级论点。";
-  return task.description || "打开当前材料，先完成一个最小动作。";
+  return readTaskText(task.description, ["description", "minimumOutput", "text"])
+    || readTaskText(task.minimum, ["minimumOutput", "description", "text"])
+    || "打开当前材料，先完成一个最小动作。";
 }
 
 function prepareFiveMinuteStartup(task) {
@@ -1338,6 +1481,7 @@ function showFocusRecoveryIfNeeded() {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
   document.body.classList.add("focus-mode-active");
@@ -1386,10 +1530,15 @@ function showFocusWrapup(session) {
     : null;
   if (canOpenFocusWrapupResult(resultAction)) {
     pendingFocusWrapup = null;
+    pendingFocusResultSession = {
+      sessionId: String(session.id || ""),
+      taskId: String(task && task.id || ""),
+    };
     exitFocusMode();
     openFocusWrapupResult(task, resultAction);
     return;
   }
+  pendingFocusResultSession = null;
   pendingFocusWrapup = session;
   document.querySelector("#focusWrapupTask").textContent = `${session.taskTime ? `${session.taskTime} · ` : ""}${session.taskName || "未选择任务"}`;
   document.querySelector("#focusWrapupDuration").textContent = formatFocusClock(session.seconds);
@@ -1399,6 +1548,7 @@ function showFocusWrapup(session) {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
   document.body.classList.add("focus-mode-active");
@@ -1414,6 +1564,7 @@ function showFiveMinuteStartupChoice(session) {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
   document.body.classList.add("focus-mode-active");
@@ -1508,6 +1659,7 @@ function finishFocusWrapup(continueNext) {
 
 function skipFocusWrapup() {
   pendingFocusWrapup = null;
+  pendingFocusResultSession = null;
   exitFocusMode();
 }
 
@@ -1637,7 +1789,7 @@ function getSafeguardTaskDescription(step, task) {
   if (step.key === "politics") {
     return "完成政治最低动作：先做5道选择题，标记错因，并保存今天的真实结果。";
   }
-  return task.description || task.minimum || "";
+  return getTaskExecutionDescription(task);
 }
 
 function getSafeguardExecutionSurfaceModel(state, plan = getTodayPlan()) {
@@ -2333,10 +2485,12 @@ function enterFocusMode() {
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
   document.body.classList.add("focus-mode-active");
 }
 
 function startImmersiveFocus(task, options = {}) {
+  pendingFocusResultSession = null;
   const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
   if (options.directFree === true && !hasPendingRound) {
     setFocusTimingMode(FREE_FOCUS_MODE);
@@ -2375,6 +2529,7 @@ function exitFocusMode() {
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
 }
 
 function bindTaskControls() {
@@ -2394,7 +2549,11 @@ function bindTaskControls() {
   document.querySelector("#toggleSafeguardModeBtn").addEventListener("click", exitSafeguardMode);
   document.querySelector("#dismissDailyHandoffBtn").addEventListener("click", dismissDailyHandoff);
   document.querySelector("#startResultHandoffNextBtn").addEventListener("click", startResultHandoffNext);
+  document.querySelector("#startResultHandoffFreeBtn").addEventListener("click", startResultHandoffFreeFocus);
   document.querySelector("#dismissResultHandoffBtn").addEventListener("click", dismissResultHandoff);
+  document.querySelector("#focusResultHandoffStartBtn").addEventListener("click", startResultHandoffNext);
+  document.querySelector("#focusResultHandoffFreeBtn").addEventListener("click", startResultHandoffFreeFocus);
+  document.querySelector("#focusResultHandoffLaterBtn").addEventListener("click", dismissResultHandoff);
   document.querySelector("#exitFocusModeBtn").addEventListener("click", exitFocusMode);
   document.querySelector("#focusModeStartBtn").addEventListener("click", startPomodoro);
   document.querySelector("#focusModePauseBtn").addEventListener("click", () => pausePomodoro("manual-pause"));
@@ -2433,6 +2592,7 @@ function bindTaskControls() {
       document.querySelector("#focusStartupBlockerInput").focus();
       return;
     }
+    if (!document.querySelector("#focusResultHandoffCard").hidden) return dismissResultHandoff();
     if (!document.querySelector("#focusWrapupCard").hidden) return skipFocusWrapup();
     if (pomodoroTimerId) pausePomodoro();
     exitFocusMode();

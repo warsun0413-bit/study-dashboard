@@ -43,6 +43,30 @@ const validPlan = {
   ],
 };
 
+test("legacy structured task text is projected without object-string leakage", () => {
+  const [task] = context.availableTasks({ tasks: [{
+    id: "722",
+    sourceTaskKey: "722",
+    category: "maYuan",
+    counted: true,
+    status: "not-started",
+    name: "722",
+    description: { description: "推进真理观" },
+    minimum: { minimumOutput: "保存闭卷框架" },
+    nextStart: { action: "核对真理与价值" },
+  }] });
+  assert.equal(task.description, "推进真理观");
+  assert.equal(task.completionCriteria, "保存闭卷框架");
+  assert.equal(task.nextStart, "核对真理与价值");
+  assert.doesNotMatch(JSON.stringify(task), /\[object Object\]/);
+  const [placeholder] = context.availableTasks({ tasks: [{
+    id: "844", sourceTaskKey: "844", category: "maHistory", counted: true,
+    name: "844", description: "[object Object]", minimum: "[object Object]",
+  }] });
+  assert.equal(placeholder.description, "");
+  assert.equal(placeholder.completionCriteria, "");
+});
+
 test("AI tomorrow plan accepts only available non-overlapping evidence tasks", () => {
   const available = context.availableTasks(basePlan).map((item) => ({ ...item }));
   const normalized = context.normalizePlan(validPlan, { expectedDate: "2026-08-03", availableTasks: available, hasDueReviews: true });
@@ -229,10 +253,10 @@ test("new plan core remains loaded before review in the current cache", () => {
   const coreIndex = indexSource.indexOf("js/ai-tomorrow-plan-core.js");
   const reviewIndex = indexSource.indexOf("js/review.js");
   assert.ok(coreIndex > 0 && reviewIndex > coreIndex);
-  assert.match(indexSource, /js\/ai-tomorrow-plan-core\.js\?v=evidence-truth-v131/);
-  assert.match(serviceWorkerSource, /js\/ai-tomorrow-plan-core\.js\?v=evidence-truth-v131/);
-  assert.match(indexSource, /js\/review\.js\?v=target-truth-v133/);
-  assert.match(serviceWorkerSource, /js\/review\.js\?v=target-truth-v133/);
+  assert.match(indexSource, /js\/ai-tomorrow-plan-core\.js\?v=focus-result-handoff-v140/);
+  assert.match(serviceWorkerSource, /js\/ai-tomorrow-plan-core\.js\?v=focus-result-handoff-v140/);
+  assert.match(indexSource, /js\/review\.js\?v=focus-result-handoff-v140/);
+  assert.match(serviceWorkerSource, /js\/review\.js\?v=focus-result-handoff-v140/);
   assert.match(serviceWorkerSource, /study-dashboard-professional-multiline-v120/);
   assert.doesNotMatch(serviceWorkerSource, /ai-tomorrow-plan-v91|deepseek-daily-review-v90/);
 });

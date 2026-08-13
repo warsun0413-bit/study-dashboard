@@ -435,6 +435,13 @@ textarea { resize: vertical; }
 .focus-thought-capture .status { display: block; min-height: 1.2em; margin-top: 5px; font-size: .78rem; }
 .focus-wrapup-card { max-width: 640px; }
 .focus-wrapup-card[hidden] { display: none; }
+.focus-result-handoff-card { max-width: 680px; }
+.focus-result-handoff-card[hidden] { display: none; }
+.focus-result-handoff-next { max-width: 600px; margin: 30px auto 10px; color: var(--primary); font-size: 1.28rem; font-weight: 750; line-height: 1.55; }
+.focus-result-handoff-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 600px; margin: 34px auto 0; }
+.focus-result-handoff-actions .button { min-height: 52px; }
+.focus-result-handoff-actions .ghost { grid-column: 1 / -1; }
+.focus-result-handoff-card > .status { display: block; min-height: 1.3em; margin-top: 10px; }
 .focus-startup-choice-card { max-width: 640px; }
 .focus-startup-choice-card[hidden] { display: none; }
 .focus-recovery-card { max-width: 640px; }

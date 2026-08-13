@@ -14,6 +14,23 @@ let pendingAiTomorrowPlan = null;
 let aiRollingWeekRequestInFlight = false;
 let pendingAiRollingWeekPlan = null;
 
+function readReviewTaskText(value, preferredFields = []) {
+  if (typeof readTaskText === "function") return readTaskText(value, preferredFields);
+  if (typeof value === "string") {
+    const text = value.trim();
+    return /^\[object\s+[^\]]+\]$/i.test(text) ? "" : text;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) return value.map((item) => readReviewTaskText(item, preferredFields)).filter(Boolean).join("；");
+  if (!value || typeof value !== "object") return "";
+  const fields = [...new Set([...preferredFields, "nextStart", "action", "description", "minimumOutput", "text", "label"])];
+  for (const field of fields) {
+    const text = readReviewTaskText(value[field]);
+    if (text) return text;
+  }
+  return "";
+}
+
 function buildDailyAiReviewData(record = {}) {
   const tasks = Array.isArray(record.tasks) ? record.tasks : [];
   return {
@@ -311,12 +328,12 @@ function renderAiTomorrowPlanPreview() {
     const storedTasks = (Array.isArray(storedPlan.tasks) ? storedPlan.tasks : []).filter((task) => task && task.aiPlanned === true).map((task) => ({
       sourceTaskKey: getAiPlanTaskSourceKey(task),
       basis: ["today-carryover", "original-plan"].includes(task.aiPlanBasis) ? task.aiPlanBasis : "",
-      time: String(task.time || ""),
-      description: String(task.description || ""),
-      nextStart: String(task.nextStart || task.description || ""),
-      completionCriteria: String(task.completionCriteria || task.minimum || ""),
-      fallback: String(task.fallbackPlan || task.fallback || ""),
-      name: String(task.name || task.subject || getAiPlanTaskSourceKey(task)),
+      time: readReviewTaskText(task.time),
+      description: readReviewTaskText(task.description, ["description", "minimumOutput", "text"]),
+      nextStart: readReviewTaskText(task.nextStart || task.description, ["nextStart", "action", "description"]),
+      completionCriteria: readReviewTaskText(task.completionCriteria || task.minimum, ["completionCriteria", "minimumOutput", "description"]),
+      fallback: readReviewTaskText(task.fallbackPlan || task.fallback, ["fallback", "description", "text"]),
+      name: readReviewTaskText(task.name || task.subject || getAiPlanTaskSourceKey(task)),
     })).filter((task) => task.sourceTaskKey);
     if (todayRecord && storedAiPlan && storedTasks.length) {
       summary.textContent = `${String(storedAiPlan.summary || "已生成并应用AI明日计划")}（已应用到 ${storedPlan.date || storedContext.tomorrowDate}）`;
@@ -992,19 +1009,19 @@ function snapshotTask(task) {
     id: task.id,
     taskId: task.taskId || task.id,
     sourceTaskKey: task.sourceTaskKey || "",
-    time: task.time || "",
-    name: task.name || "",
-    description: task.description || task.minimum || "",
-    minimum: task.minimum || "",
+    time: readReviewTaskText(task.time),
+    name: readReviewTaskText(task.name),
+    description: readReviewTaskText(task.description || task.minimum, ["description", "minimumOutput", "text"]),
+    minimum: readReviewTaskText(task.minimum, ["minimumOutput", "description", "text"]),
     status: getTaskStatus(task),
     completed: getTaskStatus(task) === "completed",
     counted: task.counted,
     exercise: task.exercise,
     category: task.category || "",
     focusSeconds: getTaskFocusSeconds(getDateKey(), task.id),
-    nextStart: task.nextStart || "",
-    completionCriteria: task.completionCriteria || "",
-    fallbackPlan: task.fallbackPlan || "",
+    nextStart: readReviewTaskText(task.nextStart, ["nextStart", "action", "description"]),
+    completionCriteria: readReviewTaskText(task.completionCriteria, ["completionCriteria", "minimumOutput", "description"]),
+    fallbackPlan: readReviewTaskText(task.fallbackPlan, ["fallback", "description", "text"]),
     aiPlanned: task.aiPlanned === true,
     aiPlanGeneratedAt: task.aiPlanGeneratedAt || "",
   };

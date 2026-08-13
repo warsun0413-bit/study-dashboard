@@ -7,7 +7,7 @@
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=task-row-free-focus-v136">
+  <link rel="stylesheet" href="style.css?v=focus-result-handoff-v140">
 </head>
 <body>
   <header class="site-header">
@@ -104,6 +104,7 @@
         </div>
         <div class="result-handoff-actions">
           <button id="startResultHandoffNextBtn" class="button primary" type="button">先做下一项5分钟</button>
+          <button id="startResultHandoffFreeBtn" class="button secondary" type="button" hidden>下一项自由专注</button>
           <button id="dismissResultHandoffBtn" class="button ghost" type="button">稍后再做</button>
         </div>
       </div>
@@ -560,11 +561,23 @@
         <button id="skipWrapupBtn" class="button ghost" type="button">跳过</button>
       </div>
     </section>
+    <section id="focusResultHandoffCard" class="focus-card focus-result-handoff-card" role="dialog" aria-modal="true" aria-labelledby="focusResultHandoffTitle" hidden>
+      <p class="step">本轮结果已保存</p>
+      <h2 id="focusResultHandoffTitle">正式结果已进入今日记录</h2>
+      <p id="focusResultHandoffNext" class="focus-result-handoff-next"></p>
+      <p id="focusResultHandoffDescription" class="focus-description muted"></p>
+      <div class="focus-result-handoff-actions">
+        <button id="focusResultHandoffStartBtn" class="button primary" type="button">先做下一项5分钟</button>
+        <button id="focusResultHandoffFreeBtn" class="button secondary" type="button" hidden>下一项自由专注</button>
+        <button id="focusResultHandoffLaterBtn" class="button ghost" type="button">稍后再做</button>
+      </div>
+      <span id="focusResultHandoffStatus" class="status" aria-live="polite"></span>
+    </section>
   </div>
 
-  <script src="js/execution-state-core.js?v=guidance-truth-v129"></script>
+  <script src="js/execution-state-core.js?v=focus-result-handoff-v140"></script>
   <script src="js/plan-window-core.js?v=time-window-first-v134"></script>
-  <script src="js/ai-tomorrow-plan-core.js?v=evidence-truth-v131"></script>
+  <script src="js/ai-tomorrow-plan-core.js?v=focus-result-handoff-v140"></script>
   <script src="js/ai-rolling-week-plan-core.js?v=capacity-evidence-v132"></script>
   <script src="js/admission-readiness-core.js?v=admission-joint-v114"></script>
   <script src="js/progress-runner-core.js?v=execution-target-v126"></script>
@@ -577,11 +590,11 @@
   <script src="js/migrations.js?v=ai-plan-calibration-v92"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=background-focus-v118"></script>
-  <script src="js/tasks.js?v=task-row-free-focus-v136"></script>
+  <script src="js/tasks.js?v=focus-result-handoff-v140"></script>
   <script src="js/study-time.js?v=target-truth-v133"></script>
   <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
-  <script src="js/review.js?v=target-truth-v133"></script>
+  <script src="js/review.js?v=focus-result-handoff-v140"></script>
   <script src="js/nankai-control-plan-2026-08-06.js?v=control-plan-import-v105"></script>
   <script src="js/data-safety.js?v=admission-joint-v114"></script>
   <script src="js/p1-results.js?v=reading-notes-v116"></script>

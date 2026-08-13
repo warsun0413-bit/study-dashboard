@@ -158,6 +158,7 @@ test("result handoff stays hidden without a formal receipt", () => {
   assert.equal(model.visible, false);
   assert.equal(model.command.valid, false);
   assert.equal(model.taskId, "");
+  assert.equal(model.freeFocusAvailable, false);
 });
 
 test("result handoff closes safely when no next task exists", () => {
@@ -167,6 +168,7 @@ test("result handoff closes safely when no next task exists", () => {
   assert.equal(model.nextText, "今日正式任务已完成；可以检查记录后收工。");
   assert.equal(model.buttonLabel, "");
   assert.equal(model.command.valid, false);
+  assert.equal(model.freeFocusAvailable, false);
 });
 
 test("result handoff distinguishes continuing the same task from starting the next task", () => {
@@ -181,6 +183,7 @@ test("result handoff distinguishes continuing the same task from starting the ne
   assert.equal(current.buttonLabel, "继续当前任务");
   assert.equal(current.command.taskId, "plan-722");
   assert.equal(current.command.taskAction, "unified-start");
+  assert.equal(current.freeFocusAvailable, false);
 
   const next = createResultHandoffModel({
     receipt,
@@ -191,6 +194,25 @@ test("result handoff distinguishes continuing the same task from starting the ne
   assert.equal(next.nextText, "下一项：844 · 复述理论演进线");
   assert.equal(next.buttonLabel, "先做下一项5分钟");
   assert.equal(next.command.taskId, "plan-844");
+  assert.equal(next.freeFocusAvailable, true);
+});
+
+test("result handoff offers direct free focus only for a fresh start command", () => {
+  const receipt = { taskId: "plan-722", savedLabel: "已保存：722" };
+  const fresh = createResultHandoffModel({
+    receipt,
+    executionCommand: resultTargetCommand("plan-844"),
+    executionLabel: "先做下一项5分钟",
+    task: { taskId: "plan-844", name: "844", description: "闭卷复述", status: "not-started" },
+  });
+  const record = createResultHandoffModel({
+    receipt,
+    executionCommand: resultTargetCommand("plan-844", "unified-record"),
+    executionLabel: "记录结果",
+    task: { taskId: "plan-844", name: "844", description: "补齐结果", status: "in-progress" },
+  });
+  assert.equal(fresh.freeFocusAvailable, true);
+  assert.equal(record.freeFocusAvailable, false);
 });
 
 test("result handoff matching rejects changed receipts tasks and actions", () => {
@@ -277,8 +299,9 @@ test("result handoff display snapshot covers every visible field", () => {
     executionLabel: "先做下一项5分钟",
     task: { taskId: "plan-844", name: "844", description: "闭卷复述", status: "not-started" },
   });
-  assert.equal(model.displayKey, [model.title, model.nextText, model.buttonLabel].join("\n"));
+  assert.equal(model.displayKey, [model.title, model.nextText, model.buttonLabel, "free-focus"].join("\n"));
   assert.equal(resultHandoffModelsMatch(model, { ...model, displayKey: `${model.displayKey}\nchanged` }), false);
+  assert.equal(resultHandoffModelsMatch(model, { ...model, freeFocusAvailable: false }), false);
 });
 
 test("result handoff rejects a task that does not match the latest execution command", () => {

@@ -134,7 +134,7 @@ function createResultHandoffModel(input = {}) {
   const savedLabel = executionSurfaceText(receipt.savedLabel);
   const emptyCommand = () => createExecutionSurfaceCommand(null);
   if (!receiptTaskId) {
-    return { visible: false, receiptKey: "", taskKey: "", displayKey: "", title: "", nextText: "", buttonLabel: "", taskId: "", command: emptyCommand() };
+    return { visible: false, receiptKey: "", taskKey: "", displayKey: "", title: "", nextText: "", buttonLabel: "", taskId: "", freeFocusAvailable: false, command: emptyCommand() };
   }
   const task = input.task && typeof input.task === "object" ? input.task : {};
   const executionCommand = input.executionCommand && typeof input.executionCommand === "object"
@@ -164,9 +164,15 @@ function createResultHandoffModel(input = {}) {
         : `下一项：${taskName} · ${taskDescription}`,
     buttonLabel: taskId ? executionLabel : "",
     taskId,
+    freeFocusAvailable: Boolean(taskId
+      && taskStatus === "not-started"
+      && executionCommand.taskAction === "unified-start"),
     command,
   };
-  return { ...model, displayKey: [model.title, model.nextText, model.buttonLabel].join("\n") };
+  return {
+    ...model,
+    displayKey: [model.title, model.nextText, model.buttonLabel, model.freeFocusAvailable ? "free-focus" : "no-free-focus"].join("\n"),
+  };
 }
 
 function resultHandoffModelsMatch(left, right) {
@@ -174,5 +180,6 @@ function resultHandoffModelsMatch(left, right) {
     && left.receiptKey === right.receiptKey
     && left.taskKey === right.taskKey
     && left.displayKey === right.displayKey
+    && left.freeFocusAvailable === right.freeFocusAvailable
     && executionSurfaceCommandsMatch(left.command, right.command));
 }

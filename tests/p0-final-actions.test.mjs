@@ -162,9 +162,9 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
+  assert.match(indexSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
 });
 
 test("all takeover builders return views instead of writing cockpit fields", () => {
@@ -217,9 +217,9 @@ test("five-minute completion offers only continue or blocker pause", () => {
   assert.match(styleSource, /\.focus-overlay-selector\[hidden\] \{ display: none; \}/);
 });
 
-test("formal tasks leave focus through one direct result handoff", () => {
+test("formal tasks carry the settled focus session into one direct result handoff", () => {
   assert.match(tasksSource, /function canOpenFocusWrapupResult\(action\)/);
-  assert.match(tasksSource, /if \(canOpenFocusWrapupResult\(resultAction\)\) \{\s*pendingFocusWrapup = null;\s*exitFocusMode\(\);\s*openFocusWrapupResult\(task, resultAction\);/);
+  assert.match(tasksSource, /if \(canOpenFocusWrapupResult\(resultAction\)\) \{\s*pendingFocusWrapup = null;\s*pendingFocusResultSession = \{[\s\S]*sessionId: String\(session\.id \|\| ""\)[\s\S]*taskId: String\(task && task\.id \|\| ""\)[\s\S]*exitFocusMode\(\);\s*openFocusWrapupResult\(task, resultAction\);/);
   assert.match(tasksSource, /\["words", "reading", "english", "politics"\]\.includes\(action\.kind\)/);
   assert.match(tasksSource, /action\.kind === "output"/);
   assert.match(tasksSource, /action\.kind === "professional"/);
@@ -244,9 +244,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(indexSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
+  assert.match(indexSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=task-row-free-focus-v136/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=focus-result-handoff-v140/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-workload-v125/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -317,7 +317,7 @@ test("historical breakpoints keep provenance in display but not in the raw actio
   assert.match(tasksSource, /source: "manual-edit", date: getDateKey\(\)/);
   assert.match(tasksSource, /function formatTaskStartDate\(dateKey\)/);
   assert.match(tasksSource, /承接 \$\{date\} 正式记录/);
-  assert.match(tasksSource, /if \(context\.source === "manual-edit"\) return `人工调整：\$\{context\.action\}`/);
+  assert.match(tasksSource, /if \(context\.source === "manual-edit"\) return `人工调整：\$\{action\}`/);
   assert.match(tasksSource, /function getTaskExactStartAction\(task\)[\s\S]*getTaskStartContext\(task\)\?\.action/);
 });
 
@@ -346,6 +346,7 @@ test("successful formal results return one transient receipt and prepare the nex
   assert.match(indexSource, /id="resultHandoffTitle"/);
   assert.match(indexSource, /id="resultHandoffNext"/);
   assert.match(indexSource, /id="startResultHandoffNextBtn"[^>]*>先做下一项5分钟<\/button>/);
+  assert.match(indexSource, /id="startResultHandoffFreeBtn"[^>]*hidden>下一项自由专注<\/button>/);
   assert.match(indexSource, /id="dismissResultHandoffBtn"[^>]*>稍后再做<\/button>/);
   assert.match(styleSource, /\.result-handoff-receipt\[hidden\] \{ display: none; \}/);
   assert.match(styleSource, /\.result-handoff-receipt \.result-handoff-actions/);
@@ -359,7 +360,8 @@ test("successful formal results return one transient receipt and prepare the nex
   assert.match(executionStateSource, /function resultHandoffModelsMatch\(left, right\)/);
   assert.match(executionStateSource, /left\.taskKey === right\.taskKey/);
   assert.match(executionStateSource, /left\.displayKey === right\.displayKey/);
-  assert.match(executionStateSource, /displayKey: \[model\.title, model\.nextText, model\.buttonLabel\]\.join\("\\n"\)/);
+  assert.match(executionStateSource, /left\.freeFocusAvailable === right\.freeFocusAvailable/);
+  assert.match(executionStateSource, /displayKey: \[model\.title, model\.nextText, model\.buttonLabel, model\.freeFocusAvailable \? "free-focus" : "no-free-focus"\]\.join\("\\n"\)/);
   assert.match(tasksSource, /createResultHandoffModel\(\{[\s\S]*receipt: resultHandoffReceipt,[\s\S]*executionCommand,[\s\S]*executionLabel: executionSnapshot\?\.view\?\.primary\?\.label,[\s\S]*description: getTaskExecutionDescription\(task\),[\s\S]*status: getTaskStatus\(task\)/);
   const resultModelSource = tasksSource.slice(tasksSource.indexOf("function getResultHandoffModel"), tasksSource.indexOf("function renderResultHandoff"));
   assert.match(resultModelSource, /executionSnapshot\?\.command \|\| createExecutionSurfaceCommand\(null\)/);
@@ -368,12 +370,12 @@ test("successful formal results return one transient receipt and prepare the nex
   assert.match(tasksSource, /activeResultHandoffModel = model/);
   assert.match(tasksSource, /function showResultHandoff\(taskId, savedLabel\)/);
   assert.match(tasksSource, /\[task\.id, task\.taskId\]\.some\(\(candidate\) => String\(candidate \|\| ""\) === savedTaskId\)/);
-  assert.match(tasksSource, /renderResultHandoff\(\);\s*const nextText/);
+  assert.match(tasksSource, /renderResultHandoff\(\);\s*if \(completePendingFocusResultSession\(activeResultHandoffModel\)\)/);
   assert.match(tasksSource, /#execution"\)\?\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
   assert.match(tasksSource, /#enterFocusModeBtn"\)\?\.focus\(\{ preventScroll: true \}\)/);
   const handoffSource = tasksSource.slice(tasksSource.indexOf("function showResultHandoff"), tasksSource.indexOf("function dismissResultHandoff"));
   assert.doesNotMatch(handoffSource, /localStorage|sessionStorage|writeJson|saveTodayPlan|startPomodoro/);
-  assert.match(tasksSource, /function startResultHandoffNext\(\)[\s\S]*getResultHandoffModel\(getExecutionSurfaceSnapshot\(\)\)[\s\S]*resultHandoffModelsMatch\(activeResultHandoffModel, freshModel\)[\s\S]*下一任务状态已更新，请确认后再点击[\s\S]*dismissResultHandoff\(\)[\s\S]*executeExecutionSurfaceCommand\(freshModel\.executionSnapshot\)/);
+  assert.match(tasksSource, /function startResultHandoffNext\(\)[\s\S]*getResultHandoffModel\(getExecutionSurfaceSnapshot\(\)\)[\s\S]*resultHandoffModelsMatch\(activeResultHandoffModel, freshModel\)[\s\S]*setResultHandoffStaleStatus\(\)[\s\S]*dismissResultHandoff\(\)[\s\S]*executeExecutionSurfaceCommand\(freshModel\.executionSnapshot\)/);
   const startHandoffSource = tasksSource.slice(tasksSource.indexOf("function startResultHandoffNext"), tasksSource.indexOf("function setTaskStatus"));
   assert.doesNotMatch(startHandoffSource, /dataset\./);
   assert.doesNotMatch(startHandoffSource, /performUnifiedTaskAction/);
@@ -386,6 +388,36 @@ test("successful formal results return one transient receipt and prepare the nex
   assert.match(p1ResultsSource, /showResultHandoff\(context\.taskId, "已保存：英语阅读结果"\)/);
   assert.match(p1ResultsSource, /showResultHandoff\(taskId, "已保存：政治学习结果"\)/);
   assert.match(p1OutputSource, /showResultHandoff\(taskId, `已保存：\$\{input\.subject\} 闭卷输出`\)/);
+});
+
+test("focus result handoff closes the formal loop and keeps both next-task start modes guarded", () => {
+  assert.match(indexSource, /id="focusResultHandoffCard"[^>]*hidden/);
+  assert.match(indexSource, /id="focusResultHandoffStartBtn"/);
+  assert.match(indexSource, /id="focusResultHandoffFreeBtn"[^>]*hidden/);
+  assert.match(indexSource, /id="focusResultHandoffLaterBtn"/);
+  assert.match(styleSource, /\.focus-result-handoff-card\[hidden\] \{ display: none; \}/);
+  assert.match(tasksSource, /let pendingFocusResultSession = null/);
+  assert.match(tasksSource, /function showFocusWrapup\(session\)[\s\S]*pendingFocusResultSession = \{[\s\S]*sessionId: String\(session\.id \|\| ""\)[\s\S]*taskId: String\(task && task\.id \|\| ""\)[\s\S]*openFocusWrapupResult\(task, resultAction\)/);
+  assert.match(tasksSource, /function completePendingFocusResultSession\(model\)[\s\S]*updateFocusSessionWrapup\(pending\.sessionId, completed, nextStep\)[\s\S]*pendingFocusResultSession = null[\s\S]*renderTodayFocusOutputs\(\)[\s\S]*renderHistory\(\)/);
+  assert.match(tasksSource, /function showResultHandoff\(taskId, savedLabel\)[\s\S]*completePendingFocusResultSession\(activeResultHandoffModel\)[\s\S]*showFocusResultHandoffCard\(activeResultHandoffModel\)/);
+  assert.match(tasksSource, /function startResultHandoffFreeFocus\(\)[\s\S]*resultHandoffModelsMatch\(activeResultHandoffModel, freshModel\)[\s\S]*freshModel\.freeFocusAvailable[\s\S]*startImmersiveFocus\(task, \{ directFree: true \}\)/);
+  assert.match(executionStateSource, /freeFocusAvailable: Boolean\(taskId[\s\S]*taskStatus === "not-started"[\s\S]*executionCommand\.taskAction === "unified-start"\)/);
+  assert.match(tasksSource, /#focusResultHandoffStartBtn"\)\.addEventListener\("click", startResultHandoffNext\)/);
+  assert.match(tasksSource, /#focusResultHandoffFreeBtn"\)\.addEventListener\("click", startResultHandoffFreeFocus\)/);
+  assert.match(tasksSource, /#focusResultHandoffLaterBtn"\)\.addEventListener\("click", dismissResultHandoff\)/);
+});
+
+test("legacy structured task text stays readable across execution and review snapshots", () => {
+  assert.match(tasksSource, /function getTaskStudyRoleLabel\(task\)[\s\S]*typeof rawRole === "string"[\s\S]*\["key", "role", "id", "value", "type"\][\s\S]*typeof rawRole\.label === "string"/);
+  assert.match(tasksSource, /function readTaskText\(value, preferredFields = \[\]\)/);
+  assert.match(tasksSource, /\^\\\[object\\s\+\[\^\\\]\]\+\\\]\$\/i\.test\(text\) \? "" : text/);
+  assert.match(tasksSource, /function normalizeTaskStartAction\(value\) \{\s*const action = readTaskText\(value/);
+  assert.match(tasksSource, /function getTaskStartContext\(task\)[\s\S]*normalizeTaskStartAction\(context && context\.action\)[\s\S]*return \{ \.\.\.context, action \}/);
+  assert.match(tasksSource, /function formatTaskStartContext\(context\) \{\s*const action = normalizeTaskStartAction\(context && context\.action\)/);
+  assert.match(tasksSource, /function getTaskExecutionDescription\(task\)[\s\S]*readTaskText\(task\.description[\s\S]*readTaskText\(task\.minimum/);
+  assert.match(reviewSource, /function readReviewTaskText\(value, preferredFields = \[\]\)/);
+  assert.match(reviewSource, /description: readReviewTaskText\(task\.description \|\| task\.minimum/);
+  assert.doesNotMatch(tasksSource.slice(tasksSource.indexOf("function getTaskExecutionDescription"), tasksSource.indexOf("function getFiveMinuteStartAction")), /String\(task\.(?:description|minimum)/);
 });
 
 test("focus completion cannot bypass tracked English or politics results", () => {
