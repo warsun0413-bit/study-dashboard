@@ -7,7 +7,7 @@
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=execution-brief-v141">
+  <link rel="stylesheet" href="style.css?v=review-focus-loop-v142">
 </head>
 <body>
   <header class="site-header">
@@ -564,6 +564,37 @@
         <button id="skipWrapupBtn" class="button ghost" type="button">跳过</button>
       </div>
     </section>
+    <section id="focusReviewResultCard" class="focus-card focus-review-result-card" role="dialog" aria-modal="true" aria-labelledby="focusReviewResultTitle" hidden>
+      <p class="step">复盘专注已结算</p>
+      <h2 id="focusReviewResultTitle">留下本次闭卷证据</h2>
+      <p id="focusReviewResultMeta" class="focus-wrapup-task"></p>
+      <div class="focus-wrapup-summary" aria-live="polite">
+        <span>本轮实际专注 <strong id="focusReviewResultDuration">00:05:00</strong></span>
+      </div>
+      <div id="focusReviewEvidenceStep" class="focus-review-evidence-step">
+        <label for="focusReviewEvidence">三行闭卷证据</label>
+        <textarea id="focusReviewEvidence" rows="7" maxlength="2600" spellcheck="false">记住了=
+遗漏了=
+下一步=</textarea>
+        <small id="focusReviewEvidenceHint">请先填写“记住了”，再根据真实表现判断结果。</small>
+        <div id="focusReviewSourceContext" class="review-source-context" hidden></div>
+        <div class="focus-review-result-actions">
+          <button class="button success" type="button" data-focus-review-result="passed" disabled>通过</button>
+          <button class="button secondary" type="button" data-focus-review-result="partial" disabled>部分通过</button>
+          <button class="button ghost" type="button" data-focus-review-result="failed" disabled>未通过</button>
+        </div>
+        <button id="focusReviewLaterBtn" class="button ghost" type="button">稍后填写，保留未完成</button>
+      </div>
+      <div id="focusReviewHandoffStep" class="focus-review-handoff-step" hidden>
+        <strong id="focusReviewSavedMessage">复盘结果已保存</strong>
+        <p id="focusReviewNextMessage"></p>
+        <div class="button-row">
+          <button id="focusReviewNextBtn" class="button primary" type="button" hidden>下一条复盘5分钟</button>
+          <button id="focusReviewReturnBtn" class="button secondary" type="button">返回执行台</button>
+        </div>
+      </div>
+      <span id="focusReviewResultStatus" class="status" aria-live="polite"></span>
+    </section>
     <section id="focusResultHandoffCard" class="focus-card focus-result-handoff-card" role="dialog" aria-modal="true" aria-labelledby="focusResultHandoffTitle" hidden>
       <p class="step">本轮结果已保存</p>
       <h2 id="focusResultHandoffTitle">正式结果已进入今日记录</h2>
@@ -579,7 +610,7 @@
     </section>
   </div>
 
-  <script src="js/execution-state-core.js?v=execution-brief-v141"></script>
+  <script src="js/execution-state-core.js?v=review-focus-loop-v142"></script>
   <script src="js/plan-window-core.js?v=time-window-first-v134"></script>
   <script src="js/ai-tomorrow-plan-core.js?v=focus-result-handoff-v140"></script>
   <script src="js/ai-rolling-week-plan-core.js?v=capacity-evidence-v132"></script>
@@ -590,11 +621,11 @@
   <script src="js/p1-output-core.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration-core.js?v=anchor-aware-v127"></script>
   <script src="js/storage.js?v=admission-joint-v114"></script>
-  <script src="js/p0-results.js?v=review-workload-v125"></script>
+  <script src="js/p0-results.js?v=review-focus-loop-v142"></script>
   <script src="js/migrations.js?v=ai-plan-calibration-v92"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=background-focus-v118"></script>
-  <script src="js/tasks.js?v=execution-brief-v141"></script>
+  <script src="js/tasks.js?v=review-focus-loop-v142"></script>
   <script src="js/study-time.js?v=target-truth-v133"></script>
   <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>

@@ -448,6 +448,20 @@ textarea { resize: vertical; }
 .focus-thought-capture .status { display: block; min-height: 1.2em; margin-top: 5px; font-size: .78rem; }
 .focus-wrapup-card { max-width: 640px; }
 .focus-wrapup-card[hidden] { display: none; }
+.focus-review-result-card { max-width: 680px; }
+.focus-review-result-card[hidden] { display: none; }
+.focus-review-evidence-step { display: grid; gap: 10px; max-width: 600px; margin: 28px auto 0; text-align: left; }
+.focus-review-evidence-step > label { font-weight: 750; }
+.focus-review-evidence-step textarea { min-height: 150px; resize: vertical; font-family: ui-monospace, "Cascadia Code", "Microsoft YaHei UI", monospace; line-height: 1.65; }
+.focus-review-evidence-step small { min-height: 1.4em; color: var(--muted); line-height: 1.55; }
+.focus-review-evidence-step .review-source-context { margin-top: 4px; }
+.focus-review-result-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.focus-review-result-actions .button { min-height: 48px; }
+.focus-review-evidence-step > .ghost { justify-self: center; margin-top: 4px; }
+.focus-review-handoff-step { max-width: 600px; margin: 34px auto 0; padding: 20px; border-radius: 14px; background: var(--primary-soft); }
+.focus-review-handoff-step > strong { display: block; color: var(--primary); font-size: 1.2rem; }
+.focus-review-handoff-step > p { margin: 10px 0 22px; line-height: 1.65; }
+.focus-review-result-card > .status { display: block; min-height: 1.3em; margin-top: 12px; }
 .focus-result-handoff-card { max-width: 680px; }
 .focus-result-handoff-card[hidden] { display: none; }
 .focus-result-handoff-next { max-width: 600px; margin: 30px auto 10px; color: var(--primary); font-size: 1.28rem; font-weight: 750; line-height: 1.55; }

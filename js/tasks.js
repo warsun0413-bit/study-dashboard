@@ -96,6 +96,8 @@ let lastFinalizedFocusSession = null;
 let pendingFocusWrapup = null;
 let pendingStartupSession = null;
 let pendingFocusResultSession = null;
+let pendingFocusReview = null;
+let focusReviewNextReviewId = "";
 let activeExecutionSurfaceSnapshot = null;
 let activeResultHandoffModel = null;
 const taskPrimaryCommandByButton = new WeakMap();
@@ -323,7 +325,12 @@ function getUnifiedTaskPrimary(task, status = getTaskStatus(task)) {
   if (task && task.category === "rollingReview" && typeof getReviewExecutionState === "function") {
     const reviewState = getReviewExecutionState(readJson(reviewQueueKey, []), getDateKey(), { task });
     if (reviewState.remainingCount) {
-      return { label: `处理下一条（今日剩${reviewState.remainingCount}）`, action: "unified-review", className: "primary" };
+      return {
+        label: `处理下一条（今日剩${reviewState.remainingCount}）`,
+        action: "unified-review",
+        className: "primary",
+        contextId: String(reviewState.active && reviewState.active.reviewId || ""),
+      };
     }
     if (status === "completed") return { label: reviewState.backlogCount ? "今日预算已完成" : "今日复习已完成", action: "unified-done", className: "success", disabled: true };
     return { label: reviewState.backlogCount ? "确认今日预算完成" : "确认今日无到期", action: "unified-complete", className: "secondary" };
@@ -397,7 +404,8 @@ function getTaskRowPrimaryCommand(task, status = getTaskStatus(task), config = g
   return createExecutionSurfaceCommand(createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.DEFAULT,
     taskId: task && task.id,
-    primary: { ...config, taskId: task && task.id },
+    contextId: config.contextId,
+    primary: { ...config, taskId: task && task.id, contextId: config.contextId },
   }));
 }
 
@@ -421,7 +429,7 @@ function createTaskMoreActions(task, status, content) {
   return details;
 }
 
-function performUnifiedTaskAction(task, actionName) {
+function performUnifiedTaskAction(task, actionName, contextId = "") {
   if (!task) return false;
   const plan = getTodayPlan();
   if (actionName === "unified-start") {
@@ -438,10 +446,7 @@ function performUnifiedTaskAction(task, actionName) {
     return true;
   }
   if (actionName === "unified-review") {
-    document.querySelector("#dueReviewsTitle").scrollIntoView({ behavior: "smooth", block: "start" });
-    const activeReview = document.querySelector(".review-queue-active");
-    if (activeReview) activeReview.focus({ preventScroll: true });
-    return true;
+    return startCurrentReviewFromExecution(contextId);
   }
   if (actionName === "unified-complete") {
     if (typeof validateRollingReviewCompletion === "function") {
@@ -609,6 +614,7 @@ function showFocusResultHandoffCard(model = activeResultHandoffModel) {
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
   document.body.classList.add("focus-mode-active");
@@ -812,7 +818,7 @@ function handleTaskListClick(event) {
       setStatus("#executionStatus", "任务状态已更新，请确认后再点击。", true);
       return;
     }
-    performUnifiedTaskAction(task, freshCommand.taskAction);
+    performUnifiedTaskAction(task, freshCommand.taskAction, freshCommand.contextId);
     return;
   }
   if (performUnifiedTaskAction(task, action.dataset.taskAction)) return;
@@ -1360,9 +1366,13 @@ function resetFocusRound() {
 function finishPomodoroIfNeeded(session = lastFinalizedFocusSession) {
   if (focusTimingMode !== POMODORO_FOCUS_MODE || pomodoroRemainingSeconds > 0) return false;
   const startupCompleted = isFiveMinuteStartupRound();
+  const reviewCompleted = Boolean(pendingFocusReview && session);
   resetFocusRound();
-  setStatus("#executionStatus", startupCompleted ? "5分钟启动已完成，请选择继续25分钟或记录卡点。" : "25分钟番茄已完成，等待再次开始。");
-  if (startupCompleted) showFiveMinuteStartupChoice(session);
+  setStatus("#executionStatus", reviewCompleted
+    ? "复盘专注已结算，请填写三行闭卷证据并判断结果。"
+    : startupCompleted ? "5分钟启动已完成，请选择继续25分钟或记录卡点。" : "25分钟番茄已完成，等待再次开始。");
+  if (reviewCompleted) showFocusReviewResultCard(session);
+  else if (startupCompleted) showFiveMinuteStartupChoice(session);
   else showFocusWrapup(session);
   return true;
 }
@@ -1425,6 +1435,11 @@ function finishOrResetFocus() {
   const session = result.session || lastFinalizedFocusSession;
   resetFocusRound();
   updatePomodoroDisplay();
+  if (pendingFocusReview && session) {
+    setStatus("#executionStatus", "复盘专注已结算，请填写三行闭卷证据并判断结果。");
+    showFocusReviewResultCard(session);
+    return;
+  }
   if (focusTimingMode === FREE_FOCUS_MODE) {
     setStatus("#executionStatus", finishedSeconds ? `本次自由专注已结束：${formatFocusClock(finishedSeconds)}` : "当前没有需要结束的专注时间。");
     showFocusWrapup(session);
@@ -1590,6 +1605,7 @@ function showFocusRecoveryIfNeeded() {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
@@ -1633,6 +1649,7 @@ function recordFocusRecoveryPause() {
 
 function showFocusWrapup(session) {
   if (!session) return;
+  if (pendingFocusReview && showFocusReviewResultCard(session)) return;
   const task = getFocusWrapupTask(session);
   const resultAction = typeof getFocusWrapupResultAction === "function"
     ? getFocusWrapupResultAction(task)
@@ -1657,6 +1674,7 @@ function showFocusWrapup(session) {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
@@ -1665,6 +1683,7 @@ function showFocusWrapup(session) {
 
 function showFiveMinuteStartupChoice(session) {
   if (!session) return;
+  if (pendingFocusReview && showFocusReviewResultCard(session)) return;
   pendingStartupSession = session;
   document.querySelector("#focusStartupTask").textContent = `${session.taskTime ? `${session.taskTime} · ` : ""}${session.taskName || "当前任务"}`;
   document.querySelector("#focusStartupDuration").textContent = formatFocusClock(session.seconds);
@@ -1673,6 +1692,7 @@ function showFiveMinuteStartupChoice(session) {
   document.querySelector("#focusMainCard").hidden = true;
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = false;
   document.querySelector("#focusModeOverlay").hidden = false;
@@ -1834,10 +1854,11 @@ function getDefaultExecutionSurfaceView(task, plan = getTodayPlan(), now = new D
   return createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.DEFAULT,
     taskId: task.id,
+    contextId: config.contextId,
     meta: `${task.time || "自定时间"} · ${TASK_STATUS_LABELS[status] || "未开始"}`,
     title: task.name,
     description: getTaskExecutionDescription(task),
-    primary: { ...config, taskId: task.id },
+    primary: { ...config, taskId: task.id, contextId: config.contextId },
   });
 }
 
@@ -2252,6 +2273,7 @@ function getExecutionGapSurfaceView(takeover) {
   return createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.EXECUTION_GAP,
     taskId: task.id,
+    contextId: config.contextId,
     meta: anchorProtected
       ? anchorMeta
       : night
@@ -2270,6 +2292,7 @@ function getExecutionGapSurfaceView(takeover) {
       action: "execution-gap-action",
       delegateAction: config.action,
       taskId: task.id,
+      contextId: config.contextId,
       className: "primary",
     },
   });
@@ -2436,7 +2459,7 @@ function executeExecutionSurfaceCommand(snapshot) {
   }
   if (command.kind === "task") {
     const task = snapshot.plan.tasks.find((item) => item.id === command.taskId);
-    return performUnifiedTaskAction(task, command.taskAction);
+    return performUnifiedTaskAction(task, command.taskAction, command.contextId);
   }
   return false;
 }
@@ -2598,12 +2621,15 @@ function enterFocusMode() {
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = true;
   document.body.classList.add("focus-mode-active");
 }
 
 function startImmersiveFocus(task, options = {}) {
   pendingFocusResultSession = null;
+  pendingFocusReview = null;
+  focusReviewNextReviewId = "";
   const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
   if (options.directFree === true && !hasPendingRound) {
     setFocusTimingMode(FREE_FOCUS_MODE);
@@ -2614,10 +2640,37 @@ function startImmersiveFocus(task, options = {}) {
   if (pomodoroTimerId) enterFocusMode();
 }
 
+function getCurrentReviewExecutionState() {
+  if (typeof getReviewExecutionState !== "function") return null;
+  const plan = getTodayPlan();
+  const task = plan.tasks.find((item) => item && item.category === "rollingReview") || null;
+  return getReviewExecutionState(readJson(reviewQueueKey, []), getDateKey(), { task });
+}
+
+function startCurrentReviewFromExecution(expectedReviewId) {
+  const state = getCurrentReviewExecutionState();
+  const reviewId = String(expectedReviewId || "");
+  if (!state || !state.active || !reviewId || state.active.reviewId !== reviewId) {
+    renderTasks();
+    if (typeof renderDueReviews === "function") renderDueReviews();
+    setStatus("#executionStatus", "复盘队列已经更新，请确认当前第一条后再开始。", true);
+    return false;
+  }
+  return startReviewFiveMinuteRound(state.active);
+}
+
 function startReviewFiveMinuteRound(review) {
   const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
   if (hasPendingRound) {
     setStatus("#dueReviewsStatus", "已有未结束的专注轮，请先继续或结束当前专注，避免重复计时。", true);
+    return false;
+  }
+  const state = getCurrentReviewExecutionState();
+  const reviewId = String(review && review.reviewId || "");
+  if (!state || !state.active || !reviewId || state.active.reviewId !== reviewId) {
+    renderTasks();
+    if (typeof renderDueReviews === "function") renderDueReviews();
+    setStatus("#dueReviewsStatus", "复盘队列已经更新，请确认当前第一条后再开始。", true);
     return false;
   }
   const plan = getTodayPlan();
@@ -2626,12 +2679,142 @@ function startReviewFiveMinuteRound(review) {
     setStatus("#dueReviewsStatus", "今日计划中没有滚动复盘时间块，当前数据无法启动计时。", true);
     return false;
   }
+  pendingFocusReview = {
+    reviewId,
+    sessionId: "",
+  };
+  focusReviewNextReviewId = "";
   setCurrentTask(task.id);
   prepareFiveMinuteStartup(task);
-  syncFocusRoundGoal(`遮挡复述：${review && (review.knowledgeUnit || review.task) || "当前复盘"}`);
+  syncFocusRoundGoal(`遮挡复述：${state.active.knowledgeUnit || state.active.task || "当前复盘"}`);
   startPomodoro();
   if (pomodoroTimerId) enterFocusMode();
+  else pendingFocusReview = null;
   return Boolean(pomodoroTimerId);
+}
+
+function setFocusReviewCardVisibility() {
+  document.querySelector("#focusMainCard").hidden = true;
+  document.querySelector("#focusRecoveryCard").hidden = true;
+  document.querySelector("#focusStartupChoiceCard").hidden = true;
+  document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusResultHandoffCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = false;
+  document.querySelector("#focusModeOverlay").hidden = false;
+  document.body.classList.add("focus-mode-active");
+}
+
+function updateFocusReviewEvidenceUi() {
+  const textarea = document.querySelector("#focusReviewEvidence");
+  const validation = validateReviewEvidence(parseReviewEvidenceQuickRecord(textarea.value));
+  document.querySelectorAll("[data-focus-review-result]").forEach((button) => {
+    button.disabled = !validation.valid;
+  });
+  const hint = document.querySelector("#focusReviewEvidenceHint");
+  hint.textContent = validation.valid
+    ? "闭卷证据已填写；请核对上次缺口后，按本次真实表现判断结果。"
+    : validation.message;
+  document.querySelector("#focusReviewSourceContext").hidden = !validation.valid;
+  return validation;
+}
+
+function showFocusReviewResultCard(session) {
+  if (!pendingFocusReview || !session) return false;
+  const state = getCurrentReviewExecutionState();
+  const review = state && state.active;
+  const evidenceStep = document.querySelector("#focusReviewEvidenceStep");
+  const handoffStep = document.querySelector("#focusReviewHandoffStep");
+  const nextButton = document.querySelector("#focusReviewNextBtn");
+  pendingFocusReview.sessionId = String(session.id || "");
+  document.querySelector("#focusReviewResultDuration").textContent = formatFocusClock(session.seconds || 0);
+  nextButton.hidden = true;
+  focusReviewNextReviewId = "";
+  if (!review || review.reviewId !== pendingFocusReview.reviewId) {
+    evidenceStep.hidden = true;
+    handoffStep.hidden = false;
+    document.querySelector("#focusReviewResultMeta").textContent = "复盘队列已更新";
+    document.querySelector("#focusReviewSavedMessage").textContent = "本次未保存复盘结果";
+    document.querySelector("#focusReviewNextMessage").textContent = "请返回执行台，确认当前第一条复盘后再继续。";
+    setStatus("#focusReviewResultStatus", "旧复盘身份已失效，系统没有写入结果。", true);
+    setFocusReviewCardVisibility();
+    return true;
+  }
+  const sourceContext = typeof getReviewSourceContext === "function" ? getReviewSourceContext(review) : null;
+  document.querySelector("#focusReviewResultMeta").textContent = `${review.reviewLevel} · ${review.subject} · ${review.knowledgeUnit || review.task}`;
+  document.querySelector("#focusReviewEvidence").value = buildReviewEvidenceQuickTemplate(review.completionEvidence);
+  document.querySelector("#focusReviewSourceContext").textContent = sourceContext
+    ? `上次核对：主要遗漏=${sourceContext.mainGaps.join("、") || "无"}｜下一起点=${sourceContext.nextStart || "未记录"}`
+    : "当前记录没有可核对的专业课缺口；请仅依据本次闭卷表现判断。";
+  evidenceStep.hidden = false;
+  handoffStep.hidden = true;
+  setStatus("#focusReviewResultStatus", "");
+  updateFocusReviewEvidenceUi();
+  setFocusReviewCardVisibility();
+  document.querySelector("#focusReviewEvidence").focus();
+  return true;
+}
+
+function saveFocusReviewResult(resultCode) {
+  if (!pendingFocusReview) return;
+  const validation = updateFocusReviewEvidenceUi();
+  if (!validation.valid) {
+    setStatus("#focusReviewResultStatus", validation.message, true);
+    document.querySelector("#focusReviewEvidence").focus();
+    return;
+  }
+  const outcome = saveDueReviewResult(pendingFocusReview.reviewId, resultCode, validation.evidence);
+  if (!outcome.changed) {
+    setStatus("#focusReviewResultStatus", outcome.message, true);
+    if (outcome.stale) document.querySelectorAll("[data-focus-review-result]").forEach((button) => { button.disabled = true; });
+    return;
+  }
+  const labels = { passed: "通过", partial: "部分通过", failed: "未通过" };
+  if (pendingFocusReview.sessionId) {
+    updateFocusSessionWrapup(
+      pendingFocusReview.sessionId,
+      `复盘结果：${labels[resultCode] || resultCode}`,
+      validation.evidence.nextAction,
+    );
+    renderTodayFocusOutputs();
+    renderHistory();
+  }
+  focusReviewNextReviewId = String(outcome.nextReview && outcome.nextReview.reviewId || "");
+  pendingFocusReview = null;
+  document.querySelector("#focusReviewEvidenceStep").hidden = true;
+  document.querySelector("#focusReviewHandoffStep").hidden = false;
+  document.querySelector("#focusReviewSavedMessage").textContent = `已保存：${labels[resultCode] || resultCode}`;
+  document.querySelector("#focusReviewNextMessage").textContent = outcome.nextReview
+    ? `下一条：${outcome.nextReview.reviewLevel} · ${outcome.nextReview.subject} · ${outcome.nextReview.knowledgeUnit || outcome.nextReview.task}`
+    : "今日复盘预算已完成；返回执行台继续正式任务。";
+  document.querySelector("#focusReviewNextBtn").hidden = !focusReviewNextReviewId;
+  setStatus("#focusReviewResultStatus", outcome.message);
+}
+
+function startNextFocusReview() {
+  const reviewId = focusReviewNextReviewId;
+  focusReviewNextReviewId = "";
+  document.querySelector("#focusReviewResultCard").hidden = true;
+  if (!startCurrentReviewFromExecution(reviewId)) {
+    exitFocusMode();
+  }
+}
+
+function returnFromFocusReview() {
+  pendingFocusReview = null;
+  focusReviewNextReviewId = "";
+  exitFocusMode();
+  renderTasks();
+  document.querySelector("#execution").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deferFocusReviewEvidence() {
+  if (pendingFocusReview && pendingFocusReview.sessionId) {
+    updateFocusSessionWrapup(pendingFocusReview.sessionId, "完成复盘专注", "闭卷证据待补");
+    renderTodayFocusOutputs();
+    renderHistory();
+  }
+  setStatus("#dueReviewsStatus", "本轮专注时间已记录；复盘结果仍为未完成，请稍后补齐三行闭卷证据。", true);
+  returnFromFocusReview();
 }
 
 function exitFocusMode() {
@@ -2642,6 +2825,7 @@ function exitFocusMode() {
   document.querySelector("#focusRecoveryCard").hidden = true;
   document.querySelector("#focusStartupChoiceCard").hidden = true;
   document.querySelector("#focusWrapupCard").hidden = true;
+  document.querySelector("#focusReviewResultCard").hidden = true;
   document.querySelector("#focusResultHandoffCard").hidden = true;
 }
 
@@ -2674,6 +2858,14 @@ function bindTaskControls() {
   document.querySelector("#focusModeCompleteBtn").addEventListener("click", completeCurrentTask);
   document.querySelector("#focusStartupContinueBtn").addEventListener("click", continueAfterFiveMinuteStartup);
   document.querySelector("#focusStartupPauseBtn").addEventListener("click", recordFiveMinuteStartupBlocker);
+  document.querySelector("#focusReviewEvidence").addEventListener("input", updateFocusReviewEvidenceUi);
+  document.querySelector("#focusReviewResultCard").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-focus-review-result]");
+    if (button) saveFocusReviewResult(button.dataset.focusReviewResult);
+  });
+  document.querySelector("#focusReviewLaterBtn").addEventListener("click", deferFocusReviewEvidence);
+  document.querySelector("#focusReviewNextBtn").addEventListener("click", startNextFocusReview);
+  document.querySelector("#focusReviewReturnBtn").addEventListener("click", returnFromFocusReview);
   document.querySelector("#focusRecoveryContinueBtn").addEventListener("click", () => continueFocusRecovery());
   document.querySelector("#focusRecoveryShrinkBtn").addEventListener("click", () => continueFocusRecovery({ shrinkGoal: true }));
   document.querySelector("#focusRecoveryPauseBtn").addEventListener("click", recordFocusRecoveryPause);
@@ -2703,6 +2895,10 @@ function bindTaskControls() {
     if (!document.querySelector("#focusStartupChoiceCard").hidden) {
       setStatus("#focusStartupChoiceStatus", "请选择继续25分钟，或记录卡点后暂停。", true);
       document.querySelector("#focusStartupBlockerInput").focus();
+      return;
+    }
+    if (!document.querySelector("#focusReviewResultCard").hidden) {
+      setStatus("#focusReviewResultStatus", "请保存真实复盘结果，或选择“稍后填写”保留未完成。", true);
       return;
     }
     if (!document.querySelector("#focusResultHandoffCard").hidden) return dismissResultHandoff();

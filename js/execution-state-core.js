@@ -111,24 +111,29 @@ function createExecutionSurfaceView(input = {}) {
   const knownModes = Object.values(EXECUTION_SURFACE_MODES);
   const mode = knownModes.includes(input.mode) ? input.mode : EXECUTION_SURFACE_MODES.DEFAULT;
   const taskId = executionSurfaceText(input.taskId);
+  const contextId = executionSurfaceText(input.contextId);
   const primaryInput = input.primary && typeof input.primary === "object" ? input.primary : {};
   const primaryTaskId = executionSurfaceText(primaryInput.taskId || taskId);
+  const primaryContextId = executionSurfaceText(primaryInput.contextId || contextId);
   const taskMismatch = Boolean(taskId && primaryTaskId && taskId !== primaryTaskId);
+  const contextMismatch = Boolean(contextId && primaryContextId && contextId !== primaryContextId);
   const className = ["primary", "secondary", "success", "ghost"].includes(primaryInput.className)
     ? primaryInput.className
     : "primary";
   return {
-    valid: !taskMismatch,
+    valid: !taskMismatch && !contextMismatch,
     mode,
     taskId,
+    contextId,
     meta: executionSurfaceText(input.meta),
     title: executionSurfaceText(input.title),
     description: executionSurfaceText(input.description),
-    primary: taskMismatch ? {
+    primary: taskMismatch || contextMismatch ? {
       label: "任务状态需要刷新",
       action: "",
       delegateAction: "",
       taskId: "",
+      contextId: "",
       className: "ghost",
       disabled: true,
     } : {
@@ -136,6 +141,7 @@ function createExecutionSurfaceView(input = {}) {
       action: executionSurfaceText(primaryInput.action),
       delegateAction: executionSurfaceText(primaryInput.delegateAction),
       taskId: primaryTaskId,
+      contextId: primaryContextId,
       className,
       disabled: primaryInput.disabled === true,
     },
@@ -149,33 +155,34 @@ function createExecutionSurfaceCommand(view) {
   const primary = view && view.primary && typeof view.primary === "object" ? view.primary : {};
   const action = executionSurfaceText(primary.action);
   const taskId = executionSurfaceText(primary.taskId);
+  const contextId = executionSurfaceText(primary.contextId || view && view.contextId);
   const invalid = !view || view.valid !== true || primary.disabled === true || !action;
-  if (invalid) return { valid: false, mode, kind: "none", action: "", taskId: "", taskAction: "" };
+  if (invalid) return { valid: false, mode, kind: "none", action: "", taskId: "", contextId: "", taskAction: "" };
   if (["night-closeout", "safeguard-closeout", "daily-closeout"].includes(action)) {
-    return { valid: true, mode, kind: "closeout", action, taskId: "", taskAction: "" };
+    return { valid: true, mode, kind: "closeout", action, taskId: "", contextId: "", taskAction: "" };
   }
   if (action === "safeguard-exit") {
-    return { valid: true, mode, kind: "safeguard-exit", action, taskId: "", taskAction: "" };
+    return { valid: true, mode, kind: "safeguard-exit", action, taskId: "", contextId: "", taskAction: "" };
   }
   if (action === "daily-handoff-start" && taskId) {
-    return { valid: true, mode, kind: "handoff", action, taskId, taskAction: "unified-start" };
+    return { valid: true, mode, kind: "handoff", action, taskId, contextId, taskAction: "unified-start" };
   }
   if (action === "execution-gap-action" && taskId) {
     const taskAction = executionSurfaceText(primary.delegateAction);
     return taskAction
-      ? { valid: true, mode, kind: "task", action, taskId, taskAction }
-      : { valid: false, mode, kind: "none", action: "", taskId: "", taskAction: "" };
+      ? { valid: true, mode, kind: "task", action, taskId, contextId, taskAction }
+      : { valid: false, mode, kind: "none", action: "", taskId: "", contextId: "", taskAction: "" };
   }
   const taskActions = ["unified-start", "unified-end", "unified-record", "unified-review", "unified-complete", "unified-restore"];
   if (taskActions.includes(action) && taskId) {
-    return { valid: true, mode, kind: "task", action, taskId, taskAction: action };
+    return { valid: true, mode, kind: "task", action, taskId, contextId, taskAction: action };
   }
-  return { valid: false, mode, kind: "none", action: "", taskId: "", taskAction: "" };
+  return { valid: false, mode, kind: "none", action: "", taskId: "", contextId: "", taskAction: "" };
 }
 
 function executionSurfaceCommandsMatch(left, right) {
   if (!left || !right || left.valid !== true || right.valid !== true) return false;
-  return ["mode", "kind", "action", "taskId", "taskAction"]
+  return ["mode", "kind", "action", "taskId", "contextId", "taskAction"]
     .every((field) => executionSurfaceText(left[field]) === executionSurfaceText(right[field]));
 }
 

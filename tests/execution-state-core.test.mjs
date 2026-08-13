@@ -155,7 +155,7 @@ test("an execution gap resolves to one explicit task command", () => {
   const command = createExecutionSurfaceCommand(view);
   assert.deepEqual(
     { ...command },
-    { valid: true, mode: MODES.EXECUTION_GAP, kind: "task", action: "execution-gap-action", taskId: "plan-722", taskAction: "unified-start" },
+    { valid: true, mode: MODES.EXECUTION_GAP, kind: "task", action: "execution-gap-action", taskId: "plan-722", contextId: "", taskAction: "unified-start" },
   );
 });
 
@@ -189,6 +189,25 @@ test("a command matches only the same rendered mode task and action", () => {
   assert.equal(executionSurfaceCommandsMatch(command, { ...command }), true);
   assert.equal(executionSurfaceCommandsMatch(command, { ...command, taskId: "plan-844" }), false);
   assert.equal(executionSurfaceCommandsMatch(command, { ...command, mode: MODES.EXECUTION_GAP }), false);
+});
+
+test("a review command is bound to the same active review identity", () => {
+  const command = createExecutionSurfaceCommand(createExecutionSurfaceView({
+    mode: MODES.DEFAULT,
+    taskId: "rolling-review",
+    contextId: "review-d30-1",
+    primary: { label: "处理下一条", action: "unified-review", contextId: "review-d30-1" },
+  }));
+  assert.equal(command.valid, true);
+  assert.equal(command.contextId, "review-d30-1");
+  assert.equal(executionSurfaceCommandsMatch(command, { ...command, contextId: "review-d14-2" }), false);
+  const mismatch = createExecutionSurfaceView({
+    taskId: "rolling-review",
+    contextId: "review-d30-1",
+    primary: { label: "处理下一条", action: "unified-review", contextId: "review-d14-2" },
+  });
+  assert.equal(mismatch.valid, false);
+  assert.equal(mismatch.primary.disabled, true);
 });
 
 test("result handoff stays hidden without a formal receipt", () => {

@@ -1033,6 +1033,40 @@ function completeRollingReviewTaskIfCleared(queue) {
   return true;
 }
 
+function saveDueReviewResult(reviewId, resultCode, evidenceInput) {
+  const id = String(reviewId || "");
+  const queue = normalizeReviewQueueRecords(readJson(reviewQueueKey, []));
+  const plan = typeof getTodayPlan === "function" ? getTodayPlan() : null;
+  const task = plan && Array.isArray(plan.tasks)
+    ? plan.tasks.find((item) => item && item.category === "rollingReview")
+    : null;
+  const currentState = getReviewExecutionState(queue, getDateKey(), { task });
+  if (!id || !currentState.active || currentState.active.reviewId !== id) {
+    return {
+      changed: false,
+      stale: true,
+      message: "复盘队列已经更新，请确认当前第一条后再保存。",
+      state: currentState,
+    };
+  }
+  const outcome = applyReviewResult(queue, id, resultCode, getDateKey(), new Date().toISOString(), evidenceInput);
+  if (!outcome.changed) return { ...outcome, stale: false, state: currentState };
+  writeJson(reviewQueueKey, outcome.records);
+  const taskCompleted = completeRollingReviewTaskIfCleared(outcome.records);
+  renderDueReviews();
+  if (typeof renderTasks === "function") renderTasks();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
+  const nextState = getReviewExecutionState(outcome.records, getDateKey(), { task });
+  return {
+    ...outcome,
+    stale: false,
+    taskCompleted,
+    state: nextState,
+    nextReview: nextState.active || null,
+    savedReview: outcome.records.find((item) => item && item.reviewId === id) || null,
+  };
+}
+
 function handleDueReviewClick(event) {
   const complete = event.target.closest("[data-review-complete]");
   const start = event.target.closest("[data-review-start]");
@@ -1053,14 +1087,9 @@ function handleDueReviewClick(event) {
     const code = complete.dataset.reviewResultAction;
     const textarea = document.querySelector(`[data-review-evidence="${id}"]`);
     const evidence = parseReviewEvidenceQuickRecord(textarea && textarea.value);
-    const outcome = applyReviewResult(readJson(reviewQueueKey, []), id, code, getDateKey(), new Date().toISOString(), evidence);
+    const outcome = saveDueReviewResult(id, code, evidence);
     if (!outcome.changed) return setStatus("#dueReviewsStatus", outcome.message, true);
-    writeJson(reviewQueueKey, outcome.records);
-    const taskCompleted = completeRollingReviewTaskIfCleared(outcome.records);
-    renderDueReviews();
-    if (typeof renderTasks === "function") renderTasks();
-    if (typeof renderP0FinalHome === "function") renderP0FinalHome();
-    setStatus("#dueReviewsStatus", `${outcome.message}${taskCompleted ? " 今日滚动复盘任务已完成。" : " 已进入下一条复盘。"}`);
+    setStatus("#dueReviewsStatus", `${outcome.message}${outcome.taskCompleted ? " 今日滚动复盘任务已完成。" : " 已进入下一条复盘。"}`);
     return;
   }
   if (move) {
