@@ -4,21 +4,279 @@ const PLAN_WINDOW_MIGRATION_ID = "p0-plan-window-v1";
 const PLAN_WINDOW_DAYS = 7;
 const PLAN_IMPORT_DECISIONS = ["keep-local", "use-import", "fill-empty", "skip"];
 const PLAN_WINDOW_TASK_DEFINITIONS = [
-  { taskId: "plan-english", sourceTaskKey: "english", subject: "英语", time: "08:00—10:00", name: "英语", counted: true, category: "english" },
-  { taskId: "plan-722", sourceTaskKey: "722", subject: "722马原", time: "10:15—12:35", name: "722", counted: true, category: "maYuan" },
-  { taskId: "plan-844", sourceTaskKey: "844", subject: "844马发史", time: "14:00—16:20", name: "844", counted: true, category: "maHistory" },
-  { taskId: "plan-original-review", sourceTaskKey: "originalTextOrReview", subject: "综合复盘", time: "16:20—17:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
-  { taskId: "plan-training", sourceTaskKey: "training", subject: "训练", time: "17:10—18:10", name: "训练", exercise: true, category: "exercise" },
-  { taskId: "plan-politics", sourceTaskKey: "politics", subject: "公共政治", time: "19:10—20:10", name: "政治", counted: true, category: "politics" },
-  { taskId: "plan-output", sourceTaskKey: "outputOrMock", subject: "专业课输出", time: "20:20—21:20", name: "输出", counted: true, category: "output" },
+  { taskId: "plan-english", sourceTaskKey: "english", subject: "英语", time: "15:45—17:15", name: "英语", counted: true, category: "english" },
+  { taskId: "plan-722", sourceTaskKey: "722", subject: "722马原", time: "08:35—10:35", name: "722", counted: true, category: "maYuan" },
+  { taskId: "plan-844", sourceTaskKey: "844", subject: "844马发史", time: "10:50—12:20", name: "844", counted: true, category: "maHistory" },
+  { taskId: "plan-original-review", sourceTaskKey: "originalTextOrReview", subject: "综合复盘", time: "20:40—21:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
+  { taskId: "plan-training", sourceTaskKey: "training", subject: "训练", time: "17:30—18:30", name: "训练", exercise: true, category: "exercise" },
+  { taskId: "plan-politics", sourceTaskKey: "politics", subject: "公共政治", time: "14:00—15:30", name: "政治", counted: true, category: "politics" },
+  { taskId: "plan-output", sourceTaskKey: "outputOrMock", subject: "专业课输出", time: "19:00—20:30", name: "输出", counted: true, category: "output" },
 ];
+
+function planClockMinutes(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]); const minutes = Number(match[2]);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59 ? hours * 60 + minutes : null;
+}
+
+function getPlanTaskTimeRange(task) {
+  const [startText, endText, extra] = String(task && task.time || "").split(/[—–-]/).map((item) => item.trim());
+  if (!startText || !endText || extra) return null;
+  const start = planClockMinutes(startText); const end = planClockMinutes(endText);
+  return start === null || end === null || start === end ? null : { start, end };
+}
+
+function findPlanTaskForMinutes(tasks, currentMinutes) {
+  const minute = Number(currentMinutes);
+  if (!Number.isInteger(minute) || minute < 0 || minute >= 1440) return null;
+  return (Array.isArray(tasks) ? tasks : []).find((task) => {
+    if (!task || task.status === "completed" || task.status === "skipped" || task.completed === true) return false;
+    const range = getPlanTaskTimeRange(task);
+    if (!range) return false;
+    const { start, end } = range;
+    return end > start ? minute >= start && minute < end : minute >= start || minute < end;
+  }) || null;
+}
+
+function isExecutablePlanTask(task) {
+  if (!task || task.status === "cancelled" || task.status === "completed" || task.status === "skipped" || task.completed === true) return false;
+  if (String(task.category || "") === "rollingReview") return false;
+  return task.counted === true || task.exercise === true || (!Object.prototype.hasOwnProperty.call(task, "counted") && !task.exercise);
+}
+
+function findNextExecutablePlanTask(tasks, currentTaskId, currentMinutes) {
+  const executable = (Array.isArray(tasks) ? tasks : []).filter(isExecutablePlanTask);
+  const current = executable.find((task) => task.id === currentTaskId);
+  if (current) return current;
+  const inProgress = executable.find((task) => task.status === "in-progress");
+  if (inProgress) return inProgress;
+  return findPlanTaskForMinutes(executable, currentMinutes);
+}
+
+function findNextScheduledPlanTask(tasks, currentMinutes) {
+  const minute = Number(currentMinutes);
+  if (!Number.isInteger(minute) || minute < 0 || minute >= 1440) return null;
+  const upcoming = (Array.isArray(tasks) ? tasks : [])
+    .filter(isExecutablePlanTask)
+    .map((task) => ({ task, range: getPlanTaskTimeRange(task) }))
+    .filter((item) => item.range && item.range.start > minute)
+    .sort((left, right) => left.range.start - right.range.start);
+  return upcoming.length ? upcoming[0].task : null;
+}
+
+function buildSafeguardSequence(tasks, options = {}) {
+  const safeTasks = Array.isArray(tasks) ? tasks.filter(Boolean) : [];
+  const taskCompleted = (task) => task && (task.status === "completed" || task.completed === true);
+  const byCategory = (categories) => safeTasks.find((task) => categories.includes(String(task.category || "")));
+  const professionalCandidates = safeTasks.filter((task) => ["maYuan", "maHistory"].includes(String(task.category || "")));
+  const preferredProfessional = professionalCandidates.find((task) => task.id === options.professionalTaskId);
+  const professional = preferredProfessional
+    || professionalCandidates.find((task) => task.status === "in-progress" && !taskCompleted(task))
+    || professionalCandidates.find((task) => !taskCompleted(task))
+    || professionalCandidates[0];
+  const english = byCategory(["english", "englishReading"]);
+  const politics = byCategory(["politics"]);
+  const steps = [];
+  if (professional) steps.push({ kind: "task", key: "professional", taskId: professional.id, completed: taskCompleted(professional) });
+  if (english) steps.push({ kind: "task", key: "english", taskId: english.id, completed: taskCompleted(english) });
+  if (politics) steps.push({ kind: "task", key: "politics", taskId: politics.id, completed: taskCompleted(politics) });
+  steps.push({ kind: "closeout", key: "closeout", completed: Boolean(options.closeoutSaved) });
+  return steps;
+}
+
+function getDailyHandoffCategory(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/(?:844|马发史|发展史)/.test(text)) return "maHistory";
+  if (/(?:722|马原|基本原理)/.test(text)) return "maYuan";
+  if (/(?:英语|阅读|真题)/.test(text)) return "english";
+  if (/(?:政治|选择题)/.test(text)) return "politics";
+  if (/(?:D0|D1|D3|D7|D14|D30|复盘)/i.test(text)) return "rollingReview";
+  if (/(?:输出|论述|闭卷)/.test(text)) return "output";
+  return "";
+}
+
+function findDailyHandoffTask(tasks, category) {
+  const executable = (Array.isArray(tasks) ? tasks : []).filter((task) => {
+    if (!task || task.status === "completed" || task.status === "skipped" || task.completed === true) return false;
+    return task.counted === true || (!Object.prototype.hasOwnProperty.call(task, "counted") && task.exercise !== true);
+  });
+  if (!category || category === "rollingReview") return null;
+  const aliases = {
+    english: ["english", "englishReading"],
+    output: ["output", "d0"],
+  };
+  const categories = aliases[category] || [category];
+  return executable.find((task) => categories.includes(String(task.category || ""))) || null;
+}
+
+function buildDailyHandoffCandidate(options = {}) {
+  const todayTasks = Array.isArray(options.todayTasks) ? options.todayTasks : [];
+  const manualAction = String(options.tomorrowPriority || "").trim();
+  const explicitManualAction = manualAction && !/^(?:未记录|未填写|暂无|无)$/i.test(manualAction);
+  if (explicitManualAction) {
+    const category = getDailyHandoffCategory(manualAction);
+    const task = category ? findDailyHandoffTask(todayTasks, category) : null;
+    if (task) return { taskId: task.id, action: manualAction, source: "昨日收工记录" };
+  }
+  const breakpoints = (Array.isArray(options.professionalBreakpoints) ? options.professionalBreakpoints : [])
+    .filter((item) => item
+      && String(item.nextStart || "").trim()
+      && !/^(?:未记录|未填写|暂无|无)$/i.test(String(item.nextStart || "").trim()))
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  const breakpoint = breakpoints[0];
+  if (breakpoint) {
+    const category = String(breakpoint.subject) === "844" ? "maHistory" : String(breakpoint.subject) === "722" ? "maYuan" : "";
+    const task = findDailyHandoffTask(todayTasks, category);
+    if (task) return {
+      taskId: task.id,
+      action: String(breakpoint.nextStart).trim(),
+      source: `昨日${breakpoint.subject || "专业课"}下一准确起点`,
+    };
+  }
+  const unfinished = (Array.isArray(options.yesterdayTasks) ? options.yesterdayTasks : []).find((task) => {
+    if (!task || task.status === "completed" || task.completed === true || task.status === "skipped" || task.category === "rollingReview") return false;
+    return task.counted === true || (!Object.prototype.hasOwnProperty.call(task, "counted") && task.exercise !== true);
+  });
+  if (unfinished) {
+    const task = findDailyHandoffTask(todayTasks, String(unfinished.category || ""));
+    if (task) return {
+      taskId: task.id,
+      action: `继续昨日未完成的${String(unfinished.name || "正式任务").trim()}`,
+      source: "昨日未完成任务",
+    };
+  }
+  return null;
+}
+
+function buildScheduledDailyHandoffCandidate(options = {}, currentMinutes) {
+  const candidate = buildDailyHandoffCandidate(options);
+  if (!candidate) return null;
+  const todayTasks = Array.isArray(options.todayTasks) ? options.todayTasks : [];
+  const task = todayTasks.find((item) => item && item.id === candidate.taskId);
+  return task && findPlanTaskForMinutes([task], currentMinutes) ? candidate : null;
+}
+
+function findLatestProfessionalBreakpoint(store, subject, throughDate) {
+  const subjectCode = String(subject || "").trim();
+  if (!["722", "844"].includes(subjectCode)) return null;
+  const days = isPlanObject(store && store.days) ? store.days : {};
+  const candidates = [];
+  Object.entries(days).forEach(([dateKey, day]) => {
+    if (!isPlanDateKey(dateKey) || (throughDate && dateKey > throughDate) || !isPlanObject(day)) return;
+    const record = day[subjectCode];
+    const units = record && Array.isArray(record.units) ? record.units : [];
+    units.forEach((unit, index) => {
+      const nextStart = String(unit && unit.nextStart || "").trim();
+      if (!nextStart) return;
+      candidates.push({
+        subject: subjectCode,
+        nextStart,
+        date: dateKey,
+        unitId: String(unit.unitId || ""),
+        updatedAt: String(unit.updatedAt || unit.createdAt || unit.savedAt || ""),
+        index,
+      });
+    });
+  });
+  candidates.sort((a, b) => b.date.localeCompare(a.date)
+    || b.updatedAt.localeCompare(a.updatedAt)
+    || b.index - a.index);
+  const latest = candidates[0];
+  if (!latest) return null;
+  return {
+    subject: latest.subject,
+    nextStart: latest.nextStart,
+    date: latest.date,
+    unitId: latest.unitId,
+    updatedAt: latest.updatedAt,
+  };
+}
+
+function findLatestExecutionBreakpoint(records, actionFields, throughDate) {
+  const fields = (Array.isArray(actionFields) ? actionFields : [actionFields])
+    .map((field) => String(field || "").trim()).filter(Boolean);
+  const candidates = [];
+  (Array.isArray(records) ? records : []).forEach((record, index) => {
+    if (!isPlanObject(record) || !isPlanDateKey(record.date) || (throughDate && record.date > throughDate)) return;
+    const field = fields.find((key) => {
+      const value = String(record[key] || "").trim();
+      return value && !/^(?:未记录|未填写|暂无|无)$/i.test(value);
+    });
+    if (!field) return;
+    candidates.push({
+      action: String(record[field]).trim(),
+      date: record.date,
+      field,
+      recordId: String(record.recordId || ""),
+      updatedAt: String(record.updatedAt || record.createdAt || record.savedAt || ""),
+      index,
+    });
+  });
+  candidates.sort((a, b) => b.date.localeCompare(a.date)
+    || b.updatedAt.localeCompare(a.updatedAt)
+    || b.index - a.index);
+  const latest = candidates[0];
+  return latest ? {
+    action: latest.action,
+    date: latest.date,
+    field: latest.field,
+    recordId: latest.recordId,
+    updatedAt: latest.updatedAt,
+  } : null;
+}
+
+function inferPlanOutputSubject(task) {
+  if (!isPlanObject(task)) return "";
+  const explicit = String(task.outputSubject || task.targetSubject || "").trim();
+  if (["722", "844"].includes(explicit)) return explicit;
+  const text = [task.subject, task.description, task.minimum, task.name]
+    .map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+  const has722 = /(?:^|\D)722(?:\D|$)/.test(text);
+  const has844 = /(?:^|\D)844(?:\D|$)/.test(text);
+  return has722 === has844 ? "" : has722 ? "722" : "844";
+}
+
+function activatePlanTaskForFocus(plan, taskId) {
+  if (!plan || !Array.isArray(plan.tasks) || !taskId || taskId === "__unassigned__") return { task: null, changed: false };
+  const task = plan.tasks.find((item) => item && item.id === taskId);
+  if (!task) return { task: null, changed: false };
+  const status = task.completed === true ? "completed" : task.status || "not-started";
+  if (status === "completed" || status === "skipped") return { task, changed: false };
+  const changed = plan.currentTaskId !== task.id || status !== "in-progress" || task.completed !== false;
+  plan.currentTaskId = task.id;
+  task.status = "in-progress";
+  task.completed = false;
+  return { task, changed };
+}
+
+function clearTerminalCurrentPlanTask(plan, taskId) {
+  if (!plan || !Array.isArray(plan.tasks) || !taskId || plan.currentTaskId !== taskId) return false;
+  const task = plan.tasks.find((item) => item && item.id === taskId);
+  if (!task || (task.status !== "completed" && task.status !== "skipped" && task.completed !== true)) return false;
+  plan.currentTaskId = "";
+  return true;
+}
+
+function clearPlanCurrentTask(plan) {
+  if (!plan || !plan.currentTaskId) return false;
+  plan.currentTaskId = "";
+  return true;
+}
+
+function selectPlanCurrentTask(plan, taskId) {
+  if (!plan || !Array.isArray(plan.tasks) || !taskId) return { task: null, changed: false };
+  const task = plan.tasks.find((item) => item && item.id === taskId);
+  if (!task) return { task: null, changed: false };
+  const changed = plan.currentTaskId !== task.id;
+  plan.currentTaskId = task.id;
+  return { task, changed };
+}
 const P1_ENGLISH_PLAN_DEFINITION = PLAN_WINDOW_TASK_DEFINITIONS.find((definition) => definition.sourceTaskKey === "english");
 if (P1_ENGLISH_PLAN_DEFINITION) {
   P1_ENGLISH_PLAN_DEFINITION.resultTrackingVersion = 1;
-  P1_ENGLISH_PLAN_DEFINITION.subtasks = [
-    { subtaskId: "words", title: "英语单词", required: true },
-    { subtaskId: "reading", title: "英语阅读", required: true },
-  ];
+  P1_ENGLISH_PLAN_DEFINITION.subtasks = [{ subtaskId: "reading", title: "英语阅读", required: true }];
 }
 
 function isPlanObject(value) {
@@ -58,6 +316,15 @@ function getDetailedPlanWindow(todayKey) {
   return { windowStart, windowEnd: dates.at(-1), dates };
 }
 
+function getTrustedImportedDailyDates(plan, window) {
+  const start = String(window && window.windowStart || "");
+  const end = String(window && window.windowEnd || "");
+  return Object.keys(plan && plan.dailyPlans || {})
+    .filter(isPlanDateKey)
+    .filter((dateKey) => start && end && dateKey >= start && dateKey <= end)
+    .sort();
+}
+
 function getTaskStatusForPlan(task) {
   if (task && ["not-started", "in-progress", "completed", "skipped"].includes(task.status)) return task.status;
   return task && task.completed === true ? "completed" : "not-started";
@@ -67,7 +334,7 @@ function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
   const description = String(sourceTask && sourceTask.description || sourceTask || "").trim();
   const status = defaultStatus === "已完成" ? "completed" : defaultStatus === "进行中" ? "in-progress" : "not-started";
   const p1Metadata = {};
-  ["englishSubtasks", "politicsTarget", "outputType", "ankiTask", "debtSchedule", "nextStart", "dueReviews", "originalPlan", "adjustedPlan", "executionMode"].forEach((key) => {
+  ["englishSubtasks", "politicsTarget", "outputType", "nextStart", "dueReviews", "originalPlan", "adjustedPlan"].forEach((key) => {
     if (sourceTask && Object.prototype.hasOwnProperty.call(sourceTask, key)) p1Metadata[key] = JSON.parse(JSON.stringify(sourceTask[key]));
   });
   return {
@@ -104,7 +371,7 @@ function getCompletionCriteriaFromSchedule(fixedSchedule, definition) {
     .map((entry) => String(entry.minimumOutput || "").trim()).filter(Boolean).join("；");
 }
 
-function createDetailedPlanFromSource(dateKey, sourceDay, fixedSchedule = []) {
+function createDetailedPlanFromSource(dateKey, sourceDay, fixedSchedule = [], sourcePlan = {}) {
   const tasks = PLAN_WINDOW_TASK_DEFINITIONS.map((definition) => createPlanTask(
     definition,
     {
@@ -114,16 +381,21 @@ function createDetailedPlanFromSource(dateKey, sourceDay, fixedSchedule = []) {
     sourceDay && sourceDay.defaultStatus,
   ));
   tasks.forEach((task) => { task.date = dateKey; });
+  const p1Metadata = sourceDay && isPlanObject(sourceDay.p1Metadata)
+    ? JSON.parse(JSON.stringify(sourceDay.p1Metadata))
+    : {};
+  ["ankiTask", "debtSchedule", "executionMode"].forEach((key) => { delete p1Metadata[key]; });
   return {
     template: "nankai-plan-v2",
-    sourcePlanType: "nankai-marxism-exam-plan",
-    sourceSchemaVersion: 2,
+    sourcePlanType: String(sourcePlan.planType || ""),
+    sourceSchemaVersion: Number(sourcePlan.schemaVersion) || 0,
+    sourcePlanId: String(sourcePlan.planId || ""),
+    sourceDocumentTitle: String(sourcePlan.sourceDocument && sourcePlan.sourceDocument.title || ""),
     date: dateKey,
     weekday: String(sourceDay && sourceDay.weekday || ""),
     phase: String(sourceDay && sourceDay.phase || ""),
     targetEffectiveStudyHours: Number(sourceDay && sourceDay.targetEffectiveStudyHours) || 0,
-    executionMode: typeof EXECUTION_MODES !== "undefined" && EXECUTION_MODES.includes(sourceDay && sourceDay.executionMode) ? sourceDay.executionMode : "normal",
-    p1Metadata: sourceDay && isPlanObject(sourceDay.p1Metadata) ? JSON.parse(JSON.stringify(sourceDay.p1Metadata)) : {},
+    p1Metadata,
     tasks,
     currentTaskId: "",
   };
@@ -253,9 +525,14 @@ function buildPhaseTemplatesFromImportedPlan(plan) {
       endDate,
       targetEffectiveStudyHours: Number(day.targetEffectiveStudyHours) || Number(phase.targetEffectiveStudyHours) || 0,
       taskTemplates,
+      chapterTasks: isPlanObject(phase.chapterTasks) ? { ...phase.chapterTasks } : {},
       completionCriteria,
       milestones: phaseMilestones,
       source: `${plan.planType || "nankai-marxism-exam-plan"}@${plan.schemaVersion || 2}`,
+      sourcePlanType: String(plan.planType || "nankai-marxism-exam-plan"),
+      sourceSchemaVersion: Number(plan.schemaVersion) || 2,
+      sourcePlanId: String(plan.planId || ""),
+      sourceDocumentTitle: String(plan.sourceDocument && plan.sourceDocument.title || ""),
       goal: String(phase.goal || ""),
       acceptance: String(phase.acceptance || ""),
       sourcePhase: { ...phase },
@@ -311,8 +588,10 @@ function materializeDayFromPhaseTemplate(dateKey, phase) {
   tasks.forEach((task) => { task.date = dateKey; });
   return {
     template: "phase-template-v1",
-    sourcePlanType: "nankai-marxism-exam-plan",
-    sourceSchemaVersion: 2,
+    sourcePlanType: String(phase.sourcePlanType || ""),
+    sourceSchemaVersion: Number(phase.sourceSchemaVersion) || 0,
+    sourcePlanId: String(phase.sourcePlanId || ""),
+    sourceDocumentTitle: String(phase.sourceDocumentTitle || ""),
     date: dateKey,
     weekday: parseLocalPlanDate(dateKey).toLocaleDateString("zh-CN", { weekday: "long" }),
     phase: phase.phaseName,
@@ -342,6 +621,7 @@ function enrichDetailedPlanDay(dateKey, day) {
         ...task,
         date: task && task.date || dateKey,
         taskId,
+        time: definition && task && task.aiPlanned !== true ? definition.time : String(task && task.time || definition && definition.time || ""),
         sourceTaskKey: String(task && task.sourceTaskKey || definition && definition.sourceTaskKey || ""),
         subject: String(task && task.subject || definition && definition.subject || ""),
         completionCriteria: String(task && (task.completionCriteria || task.minimum) || ""),
@@ -385,8 +665,8 @@ function buildPlanImportPreview(plan, existingPlans, todayKey, decisions = {}) {
   Object.entries(plan.dailyPlans || {}).sort(([left], [right]) => left.localeCompare(right)).forEach(([dateKey, sourceDay]) => {
     if (dateKey < window.windowStart) { preview.skippedHistoryDates.push(dateKey); return; }
     if (dateKey > window.windowEnd) { preview.farDatesConverted.push(dateKey); delete nextPlans[dateKey]; return; }
-    const importedDay = createDetailedPlanFromSource(dateKey, sourceDay, plan.fixedSchedule);
-    if (sourceDay && (sourceDay.executionMode || sourceDay.p1Metadata || Object.values(sourceDay.tasks || {}).some((task) => task && ["englishSubtasks", "politicsTarget", "outputType", "ankiTask", "debtSchedule", "nextStart", "dueReviews"].some((key) => Object.prototype.hasOwnProperty.call(task, key))))) preview.p1MetadataChanges.push(dateKey);
+    const importedDay = createDetailedPlanFromSource(dateKey, sourceDay, plan.fixedSchedule, plan);
+    if (sourceDay && (sourceDay.p1Metadata || Object.values(sourceDay.tasks || {}).some((task) => task && ["englishSubtasks", "politicsTarget", "outputType", "nextStart", "dueReviews"].some((key) => Object.prototype.hasOwnProperty.call(task, key))))) preview.p1MetadataChanges.push(dateKey);
     const localDay = nextPlans[dateKey];
     if (!localDay) {
       nextPlans[dateKey] = importedDay;

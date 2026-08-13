@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const source = readFileSync(new URL("../js/focus-timer-core.js", import.meta.url), "utf8");
 const context = vm.createContext({ Date });
-vm.runInContext(`${source}\nglobalThis.core = { FOCUS_HEARTBEAT_GAP_MS, createFocusTimerState, normalizeFocusTimerState, startFocusTimerSegment, finalizeFocusTimerSegment, getLiveFocusSegmentSeconds, shouldShowFocusOverrun, getFocusDateKey, applyFocusSegmentToLedger };`, context);
+vm.runInContext(`${source}\nglobalThis.core = { FOCUS_HEARTBEAT_GAP_MS, createFocusTimerState, normalizeFocusTimerState, startFocusTimerSegment, refreshRunningFocusHeartbeat, finalizeFocusTimerSegment, getLiveFocusSegmentSeconds, shouldShowFocusOverrun, shouldShowFocusRecovery, getFocusDateKey, applyFocusSegmentToLedger, getFocusWrapupResultAction, normalizeFocusReason, getFocusSessionReasonLabel, groupFocusSessionsForHistory };`, context);
 const core = context.core;
 const at = (value) => new Date(value).getTime();
 
@@ -192,6 +192,50 @@ test("19. visibilitychange followed by pagehide cannot double-apply one segment"
   assert.equal(pagehide.segment, null);
 });
 
+test("20. refreshing the heartbeat keeps a hidden-tab focus segment running", () => {
+  const start = at("2026-07-18T10:00:00");
+  let state = core.startFocusTimerSegment(core.createFocusTimerState({ now: start }), { now: start, activeTaskId: "A" });
+  state = core.refreshRunningFocusHeartbeat(state, { now: start + 10 * 60_000 });
+  assert.equal(state.running, true);
+  assert.equal(core.getLiveFocusSegmentSeconds(state, start + 10 * 60_000), 600);
+  const result = core.finalizeFocusTimerSegment(state, { endedAt: start + 10 * 60_000 });
+  assert.equal(result.seconds, 600);
+});
+
+test("21. a hidden-tab pomodoro remains capped at the round remainder", () => {
+  const start = at("2026-07-18T10:00:00");
+  let state = core.startFocusTimerSegment(core.createFocusTimerState({ now: start, mode: "pomodoro", remainingSeconds: 300 }), { now: start, activeTaskId: "A" });
+  state = core.refreshRunningFocusHeartbeat(state, { now: start + 10 * 60_000 });
+  const result = core.finalizeFocusTimerSegment(state, { endedAt: start + 10 * 60_000 });
+  assert.equal(result.seconds, 300);
+  assert.equal(result.state.remainingSeconds, 0);
+});
+
+test("20. page lifecycle pause with an active round offers recovery", () => {
+  const state = core.createFocusTimerState({
+    now: at("2026-07-18T10:00:00"),
+    activeTaskId: "task-a",
+    roundStartedAt: at("2026-07-18T09:55:00"),
+    pausedReason: "page-hidden",
+  });
+  assert.equal(core.shouldShowFocusRecovery(state), true);
+  assert.equal(core.shouldShowFocusRecovery({ ...state, pausedReason: "page-reload" }), true);
+  assert.equal(core.shouldShowFocusRecovery({ ...state, pausedReason: "device-sleep" }), true);
+});
+
+test("21. manual pause, missing task, or missing round never forces recovery", () => {
+  const state = core.createFocusTimerState({
+    now: at("2026-07-18T10:00:00"),
+    activeTaskId: "task-a",
+    roundStartedAt: at("2026-07-18T09:55:00"),
+    pausedReason: "manual-pause",
+  });
+  assert.equal(core.shouldShowFocusRecovery(state), false);
+  assert.equal(core.shouldShowFocusRecovery({ ...state, activeTaskId: "" }), false);
+  assert.equal(core.shouldShowFocusRecovery({ ...state, roundStartedAt: null, pausedReason: "page-hidden" }), false);
+  assert.equal(core.shouldShowFocusRecovery({ ...state, running: true, pausedReason: "page-hidden" }), false);
+});
+
 test("20. resuming after midnight creates a separate new-date ledger entry", () => {
   const oldStart = at("2026-07-18T23:59:50");
   const midnight = at("2026-07-19T00:00:00");
@@ -223,4 +267,89 @@ test("22. completing a running task settles before completion and cannot duplica
   assert.equal(completed.state.running, false);
   assert.equal(ledger.taskTotals["2026-07-18"].A, 120);
   assert.equal(duplicate.seconds, 0);
+});
+
+test("23. wrap-up result action routes only exam-result tasks", () => {
+  assert.deepEqual({ ...core.getFocusWrapupResultAction({ id: "ma-yuan-722", category: "maYuan" }) }, {
+    kind: "professional", subject: "722", label: "保存收尾并记录722结果",
+  });
+  assert.equal(core.getFocusWrapupResultAction({ id: "exercise", category: "exercise" }), null);
+  assert.equal(core.getFocusWrapupResultAction({ id: "rolling-review", category: "rollingReview" }), null);
+});
+
+test("24. wrap-up result action keeps English, politics, and output distinct", () => {
+  assert.equal(core.getFocusWrapupResultAction({ category: "englishWords" }), null);
+  assert.equal(core.getFocusWrapupResultAction({ category: "englishReading" }).kind, "reading");
+  assert.equal(core.getFocusWrapupResultAction({ category: "english" }).kind, "reading");
+  assert.equal(core.getFocusWrapupResultAction({ category: "politics" }).kind, "politics");
+  assert.equal(core.getFocusWrapupResultAction({ category: "output" }).kind, "output");
+});
+
+test("25. browser events can never become persisted pause reasons", () => {
+  assert.equal(core.normalizeFocusReason({ type: "click" }, "manual-pause"), "manual-pause");
+  assert.equal(core.normalizeFocusReason("[object PointerEvent]", "manual-pause"), "manual-pause");
+  assert.equal(core.normalizeFocusReason("page-hidden", "manual-pause"), "page-hidden");
+  assert.equal(core.getFocusSessionReasonLabel("[object PointerEvent]"), "旧版手动暂停");
+});
+
+test("26. adjacent lifecycle fragments merge only for read-only history display", () => {
+  const raw = [
+    { id: "a", date: "2026-07-18", taskId: "722", mode: "free", seconds: 600, startedAt: "2026-07-18T10:00:00", endedAt: "2026-07-18T10:10:00", reason: "page-hidden" },
+    { id: "b", date: "2026-07-18", taskId: "722", mode: "free", seconds: 300, startedAt: "2026-07-18T10:11:00", endedAt: "2026-07-18T10:16:00", reason: "page-hidden" },
+  ];
+  const before = JSON.stringify(raw);
+  const groups = core.groupFocusSessionsForHistory(raw);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].seconds, 900);
+  assert.equal(groups[0].interruptionCount, 1);
+  assert.equal(groups[0].parts.length, 2);
+  assert.equal(JSON.stringify(raw), before);
+});
+
+test("27. task mode time and formal-boundary differences prevent history merging", () => {
+  const base = { date: "2026-07-18", taskId: "722", mode: "free", seconds: 60, reason: "page-hidden" };
+  const cases = [
+    [base, { ...base, taskId: "844", startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
+    [base, { ...base, mode: "pomodoro", startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
+    [base, { ...base, startedAt: "2026-07-18T10:04:00", endedAt: "2026-07-18T10:05:00" }],
+    [base, { ...base, reason: "free-focus-ended", startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
+    [base, { ...base, wrapupSaved: true, startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
+  ];
+  cases.forEach(([first, second]) => {
+    const sessions = [
+      { ...first, startedAt: first.startedAt || "2026-07-18T10:00:00", endedAt: first.endedAt || "2026-07-18T10:01:00" },
+      second,
+    ];
+    assert.equal(core.groupFocusSessionsForHistory(sessions).length, 2);
+  });
+});
+
+test("28. a five-minute startup pause and resume totals exactly 300 seconds", () => {
+  const start = at("2026-07-18T10:00:00");
+  let state = core.startFocusTimerSegment(core.createFocusTimerState({
+    now: start,
+    mode: "pomodoro",
+    remainingSeconds: 300,
+  }), { now: start, activeTaskId: "722", activeTaskName: "722" });
+  state.lastHeartbeatAt = start + 120_000;
+  const first = core.finalizeFocusTimerSegment(state, {
+    endedAt: start + 120_000,
+    reason: "page-hidden",
+  });
+  assert.equal(first.seconds, 120);
+  assert.equal(first.state.remainingSeconds, 180);
+  state = core.startFocusTimerSegment(first.state, {
+    now: start + 180_000,
+    activeTaskId: "722",
+    activeTaskName: "722",
+  });
+  state.lastHeartbeatAt = start + 360_000;
+  const second = core.finalizeFocusTimerSegment(state, {
+    endedAt: start + 360_000,
+    reason: "startup-completed",
+  });
+  assert.equal(second.seconds, 180);
+  assert.equal(second.state.remainingSeconds, 0);
+  assert.equal(second.state.currentFocusSeconds, 300);
+  assert.equal(core.getFocusSessionReasonLabel("startup-completed"), "5分钟启动完成");
 });

@@ -18,6 +18,8 @@ const focusThoughtsKey = "studyFocusThoughts";
 const manualTimeRecordsKey = "studyManualTimeRecords";
 const dailyStudyTargetsKey = "studyDailyTargetSeconds";
 const examStatsConfigKey = "studyExamStatsConfig";
+const admissionMockScoresKey = "studyAdmissionMockScores";
+const admissionAssessmentConfigKey = "studyAdmissionAssessmentConfig";
 const importedPlanKey = "studyImportedPlan";
 const reviewQueueKey = "reviewQueue";
 const professionalResultsKey = "studyProfessionalResults";
@@ -74,6 +76,8 @@ function ensureDataSchema() {
   if (localStorage.getItem(manualTimeRecordsKey) === null) writeJson(manualTimeRecordsKey, []);
   if (localStorage.getItem(dailyStudyTargetsKey) === null) writeJson(dailyStudyTargetsKey, {});
   if (localStorage.getItem(examStatsConfigKey) === null) writeJson(examStatsConfigKey, { startDate: "2026-07-18" });
+  if (localStorage.getItem(admissionMockScoresKey) === null) writeJson(admissionMockScoresKey, []);
+  if (localStorage.getItem(admissionAssessmentConfigKey) === null) writeJson(admissionAssessmentConfigKey, {});
   if (localStorage.getItem(reviewQueueKey) === null) writeJson(reviewQueueKey, []);
   if (localStorage.getItem(professionalResultsKey) === null) writeJson(professionalResultsKey, { schemaVersion: 1, days: {} });
   if (localStorage.getItem(englishWordRecordsKey) === null) writeJson(englishWordRecordsKey, []);

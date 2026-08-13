@@ -41,6 +41,8 @@ function isPlainObject(value) {
 
 const NANKAI_PLAN_TYPE = "nankai-marxism-exam-plan";
 const NANKAI_PLAN_SCHEMA_VERSION = 2;
+const NANKAI_CONTROL_PLAN_TYPE = "nankai-marxism-control-plan";
+const NANKAI_CONTROL_PLAN_SCHEMA_VERSION = 3;
 const NANKAI_PLAN_REQUIRED_TASKS = ["722", "844", "english", "politics", "outputOrMock", "originalTextOrReview", "training"];
 let pendingPlanImport = null;
 
@@ -55,12 +57,17 @@ function isNankaiPlanV2(value) {
   return isPlainObject(value) && value.schemaVersion === NANKAI_PLAN_SCHEMA_VERSION && value.planType === NANKAI_PLAN_TYPE;
 }
 
-function validateNankaiPlanV2(plan) {
+function isNankaiControlPlanV3(value) {
+  return isPlainObject(value) && value.schemaVersion === NANKAI_CONTROL_PLAN_SCHEMA_VERSION
+    && value.planType === NANKAI_CONTROL_PLAN_TYPE && value.planId === "nankai-control-2026-08-06";
+}
+
+function validateNankaiPlanStructure(plan, expectedStartDate) {
   const requiredFields = [
     "tentativeExamDates", "currentProgress", "coreMilestones", "phases", "weeklyPlans",
     "fixedSchedule", "weeklyCycle", "dailyPlans", "checkpointsAndMocks", "sourcesAndAssumptions",
   ];
-  if (plan.startDate !== "2026-07-18") throw new Error("新版计划 startDate 必须是 2026-07-18。");
+  if (plan.startDate !== expectedStartDate) throw new Error(`计划 startDate 必须是 ${expectedStartDate}。`);
   requiredFields.forEach((field) => {
     if (!Object.prototype.hasOwnProperty.call(plan, field)) throw new Error(`新版计划缺少字段：${field}。`);
   });
@@ -85,20 +92,55 @@ function validateNankaiPlanV2(plan) {
   return entries;
 }
 
+function validateNankaiPlanV2(plan) {
+  if (!isNankaiPlanV2(plan)) throw new Error("不是受支持的南开计划v2。");
+  return validateNankaiPlanStructure(plan, "2026-07-18");
+}
+
+function validateNankaiControlPlanV3(plan) {
+  if (!isNankaiControlPlanV3(plan)) throw new Error("不是受支持的2026-08-06总控计划。");
+  const entries = validateNankaiPlanStructure(plan, "2026-08-06");
+  const dates = entries.map(([dateKey]) => dateKey).sort();
+  if (dates.length !== 7 || dates[0] !== "2026-08-06" || dates.at(-1) !== "2026-08-12") {
+    throw new Error("总控计划详细日期必须完整覆盖 2026-08-06 至 2026-08-12。");
+  }
+  return entries;
+}
+
+function validateSupportedNankaiPlan(plan) {
+  if (isNankaiPlanV2(plan)) return validateNankaiPlanV2(plan);
+  if (isNankaiControlPlanV3(plan)) return validateNankaiControlPlanV3(plan);
+  throw new Error("不支持该计划来源或版本。");
+}
+
 function getNextDateKey(dateKey) {
   const date = new Date(`${dateKey}T12:00:00`);
   date.setDate(date.getDate() + 1);
   return getDateKey(date);
 }
 
-function importNankaiPlanV2(plan) {
-  validateNankaiPlanV2(plan);
+function importNankaiPlan(plan) {
+  validateSupportedNankaiPlan(plan);
   const today = getDateKey();
   const existingPlans = readDailyPlans();
   const preview = buildPlanImportPreview(plan, existingPlans, today);
   pendingPlanImport = { plan, today, existingPlansJson: JSON.stringify(existingPlans), preview };
   renderPlanImportPreview(preview);
   setStatus("#backupStatus", "计划已校验，尚未写入。请先核对差异预览。 ");
+}
+
+function importNankaiPlanV2(plan) {
+  validateNankaiPlanV2(plan);
+  return importNankaiPlan(plan);
+}
+
+function importBuiltInNankaiControlPlan() {
+  if (typeof NANKAI_CONTROL_PLAN_20260806 === "undefined") {
+    setStatus("#backupStatus", "内置总控计划未加载，请刷新页面后重试。", true);
+    return false;
+  }
+  importNankaiPlan(NANKAI_CONTROL_PLAN_20260806);
+  return true;
 }
 
 function getPlanImportDecisionLabels() {
@@ -181,12 +223,13 @@ function applyPlanImportPreview() {
   if (JSON.stringify(readDailyPlans()) !== pendingPlanImport.existingPlansJson) {
     const plan = pendingPlanImport.plan;
     pendingPlanImport = null;
-    importNankaiPlanV2(plan);
+    importNankaiPlan(plan);
     setStatus("#backupStatus", "预览期间本地计划发生变化，已重新生成差异；请再次确认。", true);
     return;
   }
   const preview = refreshPendingPlanPreviewFromSelections();
   const currentSnapshot = readRawStorageSnapshot();
+  const detailedPlanDates = getTrustedImportedDailyDates(pendingPlanImport.plan, preview.window);
   const targetSnapshot = {
     ...currentSnapshot,
     [dailyPlansKey]: JSON.stringify(preview.result.dailyPlans),
@@ -195,7 +238,14 @@ function applyPlanImportPreview() {
     [importedPlanKey]: JSON.stringify({
       planType: pendingPlanImport.plan.planType,
       schemaVersion: pendingPlanImport.plan.schemaVersion,
+      planId: String(pendingPlanImport.plan.planId || ""),
       startDate: pendingPlanImport.plan.startDate,
+      endDate: String(pendingPlanImport.plan.endDate || ""),
+      sourceDocumentTitle: String(pendingPlanImport.plan.sourceDocument && pendingPlanImport.plan.sourceDocument.title || ""),
+      detailedPlanRange: String(pendingPlanImport.plan.sourceDocument && pendingPlanImport.plan.sourceDocument.detailedPlanRange || ""),
+      detailedPlanDates,
+      detailedPlanStart: detailedPlanDates[0] || "",
+      detailedPlanEnd: detailedPlanDates.at(-1) || "",
       importedAt: new Date().toISOString(),
       detailedWindowStart: preview.window.windowStart,
       detailedWindowEnd: preview.window.windowEnd,
@@ -208,6 +258,7 @@ function applyPlanImportPreview() {
   renderRecentSevenDays();
   renderExamStatsConfig();
   renderExamStatsOverview();
+  if (typeof renderAiTomorrowPlanPreview === "function") renderAiTomorrowPlanPreview();
   setStatus("#backupStatus", `计划已应用：详细窗口 ${preview.window.windowStart} 至 ${preview.window.windowEnd}；远期 ${preview.farDatesConverted.length} 天已转为阶段模板。`);
 }
 
@@ -235,6 +286,7 @@ function normalizeBackup(backup) {
     collapsedSections: "collapsedSections",
     studyManualTimeRecords: manualTimeRecordsKey, studyDailyTargetSeconds: dailyStudyTargetsKey,
     studyExamStatsConfig: examStatsConfigKey, studyImportedPlan: importedPlanKey,
+    studyAdmissionMockScores: admissionMockScoresKey, studyAdmissionAssessmentConfig: admissionAssessmentConfigKey,
     studyProfessionalResults: professionalResultsKey,
     studyPlanPhaseTemplates: planPhaseTemplatesKey,
     studyPlanWindowState: planWindowStateKey,
@@ -283,6 +335,7 @@ function restoreStorageValues(values) {
   renderManualStudyRecords();
   renderStudyTimeSummary();
   renderExamStatsConfig();
+  if (typeof renderAdmissionReadiness === "function") renderAdmissionReadiness();
   renderHistory();
   renderRecentSevenDays();
   renderMigrationReport();
@@ -295,12 +348,12 @@ function restoreStorageValues(values) {
 async function importJsonBackup(file) {
   try {
     const backup = JSON.parse(await file.text());
-    if (isNankaiPlanV2(backup)) {
-      importNankaiPlanV2(backup);
+    if (isNankaiPlanV2(backup) || isNankaiControlPlanV3(backup)) {
+      importNankaiPlan(backup);
       return;
     }
     if (looksLikeStudyPlan(backup)) {
-      throw new Error("不支持旧版计划；只接受 schemaVersion 2、planType 为 nankai-marxism-exam-plan 的新版网站导入计划。");
+      throw new Error("不支持该计划版本；只接受原网站计划v2或2026-08-06总控计划v3。");
     }
     const values = normalizeBackup(backup);
     const entries = validateStorageValues(values);
@@ -324,7 +377,7 @@ function clearLearningData() {
     setStatus("#backupStatus", "二次确认未通过，未清空任何数据。 ");
     return;
   }
-  const learningKeys = [historyKey, dailyPlansKey, planPhaseTemplatesKey, planWindowStateKey, planMigrationBackupsKey, focusMinutesKey, taskFocusSecondsKey, focusTimerStateKey, focusSessionsKey, manualTimeRecordsKey, dailyStudyTargetsKey, examStatsConfigKey, importedPlanKey];
+  const learningKeys = [historyKey, dailyPlansKey, planPhaseTemplatesKey, planWindowStateKey, planMigrationBackupsKey, focusMinutesKey, taskFocusSecondsKey, focusTimerStateKey, focusSessionsKey, manualTimeRecordsKey, dailyStudyTargetsKey, examStatsConfigKey, admissionMockScoresKey, admissionAssessmentConfigKey, importedPlanKey];
   autoSaveFields.forEach((field) => learningKeys.push(field.dataset.save));
   defaultTasks.forEach(([id]) => learningKeys.push(id, `task-label:${id}`));
   [...new Set(learningKeys)].forEach((key) => localStorage.removeItem(key));
@@ -335,6 +388,7 @@ function clearLearningData() {
   renderManualStudyRecords();
   renderStudyTimeSummary();
   renderExamStatsConfig();
+  if (typeof renderAdmissionReadiness === "function") renderAdmissionReadiness();
   renderHistory();
   renderRecentSevenDays();
   if (typeof renderP0FinalHome === "function") renderP0FinalHome();

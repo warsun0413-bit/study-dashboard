@@ -2,10 +2,104 @@
 const FOCUS_TIMER_VERSION = 3;
 const FOCUS_HEARTBEAT_GAP_MS = 20_000;
 const FOCUS_INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
+const FOCUS_HISTORY_MERGE_GAP_MS = 2 * 60 * 1000;
+const FOCUS_LIFECYCLE_REASONS = new Set(["page-hidden", "pagehide", "page-reload", "device-sleep"]);
+const FOCUS_RECOVERY_REASONS = new Set(["page-hidden", "pagehide", "page-reload", "device-sleep"]);
 
 function toSafeFocusInteger(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.floor(number) : fallback;
+}
+
+function normalizeFocusReason(value, fallback = "paused") {
+  const reason = typeof value === "string" ? value.trim() : "";
+  return reason && !/^\[object\s.+\]$/.test(reason) ? reason : fallback;
+}
+
+function getFocusSessionReasonLabel(value) {
+  const reason = typeof value === "string" ? value.trim() : "";
+  const labels = {
+    "manual-pause": "手动暂停",
+    "free-focus-ended": "主动结束",
+    "pomodoro-completed": "25分钟番茄完成",
+    "startup-completed": "5分钟启动完成",
+    "pomodoro-reset": "重置番茄",
+    "task-completed": "完成任务",
+    "mode-switched": "切换专注模式",
+    "task-switched": "切换任务",
+    "page-hidden": "切换页面自动暂停",
+    pagehide: "页面退出自动暂停",
+    "page-reload": "页面刷新自动暂停",
+    "device-sleep": "设备休眠自动暂停",
+    "date-rollover": "跨日自动暂停",
+    "focus-mode-exit": "退出专注模式",
+  };
+  if (/^\[object\s.+Event\]$/.test(reason)) return "旧版手动暂停";
+  return labels[reason] || (reason ? "其他暂停" : "未记录暂停原因");
+}
+
+function getFocusSessionTime(session, field) {
+  const direct = new Date(session && session[field]).getTime();
+  if (Number.isFinite(direct)) return direct;
+  if (field !== "startedAt") return Number.NaN;
+  const endedAt = new Date(session && session.endedAt).getTime();
+  const seconds = toSafeFocusInteger(session && session.seconds, 0);
+  return Number.isFinite(endedAt) && seconds > 0 ? endedAt - seconds * 1000 : Number.NaN;
+}
+
+function groupFocusSessionsForHistory(sessions, options = {}) {
+  const mergeGapMs = toSafeFocusInteger(options.mergeGapMs, FOCUS_HISTORY_MERGE_GAP_MS);
+  const safeSessions = (Array.isArray(sessions) ? sessions : [])
+    .filter((session) => session && toSafeFocusInteger(session.seconds, 0) > 0)
+    .map((session, index) => ({ ...session, __sourceIndex: index }))
+    .sort((a, b) => {
+      const aStart = getFocusSessionTime(a, "startedAt");
+      const bStart = getFocusSessionTime(b, "startedAt");
+      if (!Number.isFinite(aStart) && !Number.isFinite(bStart)) return a.__sourceIndex - b.__sourceIndex;
+      if (!Number.isFinite(aStart)) return 1;
+      if (!Number.isFinite(bStart)) return -1;
+      return aStart - bStart || a.__sourceIndex - b.__sourceIndex;
+    });
+  const groups = [];
+  safeSessions.forEach((session) => {
+    const cleanSession = { ...session };
+    delete cleanSession.__sourceIndex;
+    const previous = groups.at(-1);
+    const previousPart = previous && previous.parts.at(-1);
+    const previousEnd = getFocusSessionTime(previousPart, "endedAt");
+    const currentStart = getFocusSessionTime(cleanSession, "startedAt");
+    const gap = currentStart - previousEnd;
+    const sameTask = Boolean(previousPart && previousPart.taskId)
+      && String(previousPart.taskId) === String(cleanSession.taskId || "");
+    const canMerge = Boolean(previousPart)
+      && previousPart.date === cleanSession.date
+      && previousPart.mode === cleanSession.mode
+      && sameTask
+      && FOCUS_LIFECYCLE_REASONS.has(String(previousPart.reason || ""))
+      && FOCUS_LIFECYCLE_REASONS.has(String(cleanSession.reason || ""))
+      && previousPart.wrapupSaved !== true
+      && cleanSession.wrapupSaved !== true
+      && Number.isFinite(gap)
+      && gap >= 0
+      && gap <= mergeGapMs;
+    if (!canMerge) {
+      groups.push({
+        ...cleanSession,
+        seconds: toSafeFocusInteger(cleanSession.seconds, 0),
+        parts: [cleanSession],
+        interruptionCount: 0,
+        grouped: false,
+      });
+      return;
+    }
+    previous.parts.push(cleanSession);
+    previous.seconds += toSafeFocusInteger(cleanSession.seconds, 0);
+    previous.endedAt = cleanSession.endedAt;
+    previous.reason = cleanSession.reason;
+    previous.interruptionCount = previous.parts.length - 1;
+    previous.grouped = true;
+  });
+  return groups;
 }
 
 function getFocusDateKey(timestamp = Date.now()) {
@@ -98,13 +192,22 @@ function startFocusTimerSegment(state, options = {}) {
   return next;
 }
 
+function refreshRunningFocusHeartbeat(state, options = {}) {
+  const now = toSafeFocusInteger(options.now, Date.now());
+  const next = createFocusTimerState({ ...state, now });
+  const startedAt = toSafeFocusInteger(next.segmentStartedAt, 0);
+  if (!next.running || !startedAt || now < startedAt) return next;
+  next.lastHeartbeatAt = now;
+  return next;
+}
+
 function finalizeFocusTimerSegment(state, options = {}) {
   const requestedEnd = toSafeFocusInteger(options.endedAt, Date.now());
   const gapThresholdMs = toSafeFocusInteger(options.gapThresholdMs, FOCUS_HEARTBEAT_GAP_MS);
   const next = createFocusTimerState({ ...state, now: requestedEnd });
   const startedAt = toSafeFocusInteger(next.segmentStartedAt, 0);
   const heartbeatAt = toSafeFocusInteger(next.lastHeartbeatAt, 0);
-  let reason = String(options.reason || "paused");
+  let reason = normalizeFocusReason(options.reason, "paused");
   let effectiveEnd = requestedEnd;
 
   if (!next.running || !startedAt || !heartbeatAt || heartbeatAt < startedAt || requestedEnd < startedAt) {
@@ -168,6 +271,16 @@ function shouldShowFocusOverrun(taskFocusSeconds, plannedSeconds, promptShown) {
   return !promptShown && planSeconds > 0 && taskSeconds >= planSeconds + 30 * 60;
 }
 
+function shouldShowFocusRecovery(state) {
+  return Boolean(
+    state
+    && state.running === false
+    && String(state.activeTaskId || "")
+    && toSafeFocusInteger(state.roundStartedAt, 0) > 0
+    && FOCUS_RECOVERY_REASONS.has(String(state.pausedReason || ""))
+  );
+}
+
 function applyFocusSegmentToLedger(focusTotals, taskTotals, segment) {
   const safeFocusTotals = focusTotals && typeof focusTotals === "object" && !Array.isArray(focusTotals) ? { ...focusTotals } : {};
   const safeTaskTotals = taskTotals && typeof taskTotals === "object" && !Array.isArray(taskTotals) ? { ...taskTotals } : {};
@@ -183,4 +296,32 @@ function applyFocusSegmentToLedger(focusTotals, taskTotals, segment) {
     safeTaskTotals[date] = { ...existingDateTotals, [taskId]: toSafeFocusInteger(existingDateTotals[taskId], 0) + seconds };
   }
   return { focusTotals: safeFocusTotals, taskTotals: safeTaskTotals, applied: true };
+}
+
+function getFocusWrapupResultAction(task) {
+  if (!task || typeof task !== "object") return null;
+  const category = String(task.category || "");
+  const identity = `${task.id || ""} ${task.taskId || ""} ${task.name || ""} ${task.sourceTaskKey || ""}`;
+  if (category === "englishWords" || /(?:^|\s)(?:english-words|sunday-words)(?:\s|$)/.test(identity)) {
+    return null;
+  }
+  if (category === "englishReading" || /(?:^|\s)(?:english-reading|sunday-reading)(?:\s|$)/.test(identity)) {
+    return { kind: "reading", label: "保存收尾并记录英语阅读结果" };
+  }
+  if (category === "english" || task.sourceTaskKey === "english") {
+    return { kind: "reading", label: "保存收尾并记录英语阅读结果" };
+  }
+  if (category === "politics" || task.sourceTaskKey === "politics") {
+    return { kind: "politics", label: "保存收尾并记录政治结果" };
+  }
+  if (category === "output" || task.sourceTaskKey === "outputOrMock") {
+    return { kind: "output", label: "保存收尾并记录闭卷输出" };
+  }
+  if (category === "maYuan" || /722/.test(identity)) {
+    return { kind: "professional", subject: "722", label: "保存收尾并记录722结果" };
+  }
+  if (category === "maHistory" || /844/.test(identity)) {
+    return { kind: "professional", subject: "844", label: "保存收尾并记录844结果" };
+  }
+  return null;
 }

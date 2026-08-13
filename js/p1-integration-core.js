@@ -1,9 +1,119 @@
 // P1 Checkpoint 5: pure weekly statistics and schema-2 snapshot derivation.
 const P1_FINAL_MIGRATION_ID = "p1-final-integration-v1";
 const P1_SNAPSHOT_SCHEMA_VERSION = 2;
+const AUXILIARY_MANUAL_ACTIVITY_PATTERN = /(?:anki(?:制作|制卡|卡片制作|卡片整理)|制作anki|整理anki卡片|网站(?:维护|开发|优化)|数据整理|整理数据|提示词(?:优化|整理|编写)|编写提示词|文件整理|整理文件|工具(?:建设|维护|开发))/i;
 
 function p1FinalObject(value) { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function p1FinalArray(value) { return Array.isArray(value) ? value : []; }
+function p1MeaningfulClosedBookText(value) {
+  const text = String(value || "").trim().replace(/\s+/g, "");
+  return Boolean(text) && !/^(无|没有|未做|未完成|未记录|否)$/.test(text);
+}
+function getDailyClosedBookGateStatus(input = {}, dateKey = getLocalPlanDateKey()) {
+  const store = p1FinalObject(input.professionalStore) ? input.professionalStore : {};
+  const days = p1FinalObject(store.days) ? store.days : {};
+  const day = p1FinalObject(days[dateKey]) ? days[dateKey] : {};
+  const professionalProducts = [];
+  ["722", "844"].forEach((subject) => {
+    const subjectRecord = p1FinalObject(day[subject]) ? day[subject] : {};
+    p1FinalArray(subjectRecord.units).forEach((unit) => {
+      if (!p1FinalObject(unit) || !String(unit.name || "").trim() || !String(unit.nextStart || "").trim()) return;
+      const product = p1MeaningfulClosedBookText(unit.closedBookResult)
+        ? "闭卷恢复"
+        : p1MeaningfulClosedBookText(unit.writtenReconstruction) ? "纸上重构" : "";
+      if (product) professionalProducts.push({ subject, product, name: String(unit.name).trim() });
+    });
+  });
+  const outputProducts = p1FinalArray(input.outputRecords).filter((record) => record
+    && record.date === dateKey
+    && record.closedBook === true
+    && Boolean(String(record.question || "").trim())
+    && Boolean(String(record.structureResult || "").trim()));
+  return {
+    hasProduct: professionalProducts.length > 0 || outputProducts.length > 0,
+    professionalProducts,
+    outputProducts,
+  };
+}
+function getCurrentDailyExecutionGap(items, options = {}) {
+  if (options.blocked) return null;
+  const nowMinutes = Number(options.nowMinutes);
+  const gaps = p1FinalArray(items)
+    .filter((item) => item
+      && item.taskId
+      && item.complete !== true
+      && (nowMinutes >= Number(item.deadlineMinutes) || item.forceEligible === true))
+    .sort((a, b) => Number(a.priority) - Number(b.priority)
+      || Number(a.deadlineMinutes) - Number(b.deadlineMinutes)
+      || String(a.key || "").localeCompare(String(b.key || "")));
+  return gaps.length ? { ...gaps[0], remainingCount: gaps.length } : null;
+}
+
+function getAnchorAwareDailyExecutionGap(items, options = {}) {
+  if (options.blocked) return null;
+  const nowMinutes = Number(options.nowMinutes);
+  const records = p1FinalArray(items).filter((item) => item && item.taskId && item.complete !== true);
+  const anchors = records
+    .filter((item) => item.isProtectedAnchor === true
+      && Number.isFinite(Number(item.startMinutes))
+      && Number.isFinite(Number(item.endMinutes)))
+    .sort((left, right) => Number(left.startMinutes) - Number(right.startMinutes));
+  const activeAnchor = anchors.find((item) => {
+    const transitionMinutes = Math.max(0, Number(item.transitionMinutes) || 0);
+    return nowMinutes >= Number(item.startMinutes) - transitionMinutes && nowMinutes < Number(item.endMinutes);
+  });
+  const eligibleGaps = records
+    .filter((item) => nowMinutes >= Number(item.deadlineMinutes) || item.forceEligible === true)
+    .sort((left, right) => Number(left.priority) - Number(right.priority)
+      || Number(left.deadlineMinutes) - Number(right.deadlineMinutes)
+      || String(left.key || "").localeCompare(String(right.key || "")));
+  if (activeAnchor) {
+    return {
+      ...activeAnchor,
+      anchorState: nowMinutes < Number(activeAnchor.startMinutes) ? "prepare" : "active",
+      remainingCount: new Set([...eligibleGaps.map((item) => item.taskId), activeAnchor.taskId]).size,
+    };
+  }
+  const nextAnchor = anchors.find((item) => {
+    const transitionMinutes = Math.max(0, Number(item.transitionMinutes) || 0);
+    return nowMinutes < Number(item.startMinutes) - transitionMinutes;
+  });
+  if (!nextAnchor) return eligibleGaps.length ? { ...eligibleGaps[0], remainingCount: eligibleGaps.length } : null;
+  const anchorPreparationStart = Number(nextAnchor.startMinutes) - Math.max(0, Number(nextAnchor.transitionMinutes) || 0);
+  const availableMinutes = anchorPreparationStart - nowMinutes;
+  const fittingGaps = eligibleGaps.filter((item) => Math.max(1, Number(item.minimumBlockMinutes) || 5) <= availableMinutes);
+  if (fittingGaps.length) return { ...fittingGaps[0], remainingCount: eligibleGaps.length };
+  const minimumBlockMinutes = Math.max(1, Number(options.minimumBlockMinutes) || 5);
+  if (availableMinutes < minimumBlockMinutes) {
+    return {
+      ...nextAnchor,
+      anchorState: "upcoming",
+      availableMinutes: Math.max(0, availableMinutes),
+      remainingCount: new Set([...eligibleGaps.map((item) => item.taskId), nextAnchor.taskId]).size,
+    };
+  }
+  return null;
+}
+
+function getNightExecutionState(items, options = {}) {
+  if (options.blocked || Number(options.nowMinutes) < Number(options.cutoffMinutes)) return null;
+  const records = p1FinalArray(items);
+  const incomplete = (key) => records.find((item) => item && item.key === key && item.taskId && item.complete !== true) || null;
+  const earliestProfessional = incomplete("722") || incomplete("844") || incomplete("closed-book");
+  const dailyProduct = records.find((item) => item && item.key === "closed-book") || null;
+  const professional = dailyProduct && dailyProduct.complete !== true ? earliestProfessional : null;
+  const english = incomplete("english");
+  const politics = incomplete("politics");
+  const support = english || (!options.englishCompletedAfterCutoff ? politics : null);
+  const selected = [professional, support].filter((item, index, source) => item
+    && source.findIndex((candidate) => candidate && candidate.taskId === item.taskId) === index);
+  if (Number(options.nowMinutes) >= Number(options.hardCutoffMinutes) || !selected.length) {
+    return { mode: "closeout", items: [], current: null, remainingCount: 0 };
+  }
+  return { mode: "tasks", items: selected, current: selected[0], remainingCount: selected.length };
+}
+function manualStudyRecordText(record) { return `${record && record.taskId || ""} ${record && record.taskTitle || ""} ${record && record.note || ""}`.replace(/\s+/g, ""); }
+function isAuxiliaryManualStudyRecord(record) { return AUXILIARY_MANUAL_ACTIVITY_PATTERN.test(manualStudyRecordText(record)); }
 function p1FinalDateInRange(date, start, end) { return /^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) && date >= start && date <= end; }
 function getP1WeekRange(dateKey) {
   const date = parseLocalPlanDate(dateKey);
@@ -21,8 +131,8 @@ function p1WeightedRate(records, correctField, totalField) {
   return { correct, total, rate: total > 0 ? correct / total : null };
 }
 function p1ValidManualRecord(record) {
-  const text = `${record && record.taskId || ""} ${record && record.taskTitle || ""}`;
-  return Number(record && record.durationSeconds) > 0 && !/居家训练|训练|锻炼|午饭|午休|洗澡|吃饭|休息|睡觉/.test(text);
+  const text = manualStudyRecordText(record);
+  return Number(record && record.durationSeconds) > 0 && !isAuxiliaryManualStudyRecord(record) && !/居家训练|训练|锻炼|午饭|午休|洗澡|吃饭|休息|睡觉/.test(text);
 }
 function getP1EffectiveSecondsByDate(input, date) {
   const focus = Math.max(0, Math.floor(Number(input.focusTotals && input.focusTotals[date]) || 0));
@@ -81,17 +191,15 @@ function buildP1WeeklyStats(input = {}, dateKey = getLocalPlanDateKey()) {
   }));
   const dailySeconds = Object.fromEntries(range.dates.map((date) => [date, getP1EffectiveSecondsByDate(input, date)]));
   const effectiveDays = Object.values(dailySeconds).filter((seconds) => seconds > 0).length;
-  const modes = executionModeStore(input.executionModes);
-  const modeCounts = Object.fromEntries(EXECUTION_MODES.map((mode) => [mode, range.dates.filter((date) => modes.days[date] && modes.days[date].mode === mode).length]));
-  const activeDebts = p1FinalArray(input.debtQueue).map((debt) => normalizeDebt(debt, dateKey)).filter((debt) => !["completed", "cancelled"].includes(debt.status));
+  const totalEffectiveSeconds = Object.values(dailySeconds).reduce((sum, seconds) => sum + seconds, 0);
+  const formalResultCount = wordRecords.length + readingRecords.length + politicsRecords.length + outputRecords.length + formalUnits.length;
   const warnings = [];
-  if (activeDebts.some((debt) => debt.ageDays > 3)) warnings.push("存在超过3天的当前欠账");
-  if (modeCounts.minimum >= 2) warnings.push("本周至少两天使用保底模式");
+  if (totalEffectiveSeconds > 0 && formalResultCount === 0) warnings.push("本周已有学习时间，但未保存英语、政治或专业课正式结果");
   if (politicsTotal.total > 0 && politicsTotal.rate < 0.6) warnings.push("政治总正确率低于60%");
   if (readingAccuracy.total > 0 && readingAccuracy.rate < 0.6) warnings.push("英语阅读正确率低于60%");
   return {
     schemaVersion: 1, range, generatedFor: dateKey,
-    effectiveStudy: { dailySeconds, totalSeconds: Object.values(dailySeconds).reduce((sum, seconds) => sum + seconds, 0), effectiveDays, averageSeconds: effectiveDays ? Math.floor(Object.values(dailySeconds).reduce((sum, seconds) => sum + seconds, 0) / effectiveDays) : 0 },
+    effectiveStudy: { dailySeconds, totalSeconds: totalEffectiveSeconds, effectiveDays, averageSeconds: effectiveDays ? Math.floor(totalEffectiveSeconds / effectiveDays) : 0 },
     plan: { completed, denominator: planned, completionRate: planned ? completed / planned : null },
     professional: { formalUnits: formalUnits.length, l2OrL3: masteryDenominator.filter((unit) => ["L2", "L3"].includes(unit.mastery || unit.masteryLevel)).length, l2OrL3Rate: masteryDenominator.length ? masteryDenominator.filter((unit) => ["L2", "L3"].includes(unit.mastery || unit.masteryLevel)).length / masteryDenominator.length : null },
     reviews: { d1Completed: completedD1.length, d1Due: validD1.length, d1CompletionRate: validD1.length ? completedD1.length / validD1.length : null, overdue: reviews.filter((review) => review && review.status === "pending" && review.dueDate < dateKey && !review.duplicateOf).length },
@@ -99,7 +207,6 @@ function buildP1WeeklyStats(input = {}, dateKey = getLocalPlanDateKey()) {
     politics: { recordCount: politicsRecords.length, single: politicsSingle, multiple: politicsMultiple, total: politicsTotal, errorCodes },
     output: { total: outputRecords.length, byType: outputByType, closedBook: outputRecords.filter((record) => record.closedBook).length, originalUsed: outputRecords.filter((record) => record.originalTextUsage && record.originalTextUsage !== "none").length, pendingRewrite: outputRecords.filter((record) => record.rewriteRequired && record.reviewStatus !== "passed").length },
     training: { completed: trainingCompleted, planned: trainingPlanned },
-    execution: { modeCounts, activeDebt: activeDebts.length, overThreeDays: activeDebts.filter((debt) => debt.ageDays > 3).length },
     warnings,
   };
 }
@@ -108,22 +215,17 @@ function buildP1TodaySnapshot(input = {}) {
   const base = buildP0TodaySnapshot(input);
   const date = base.date;
   const current = (records) => p1FinalArray(records).filter((record) => record && record.date === date);
-  const anki = p1FinalArray(input.ankiCandidates);
-  const debts = p1FinalArray(input.debtQueue).map((debt) => normalizeDebt(debt, date)).filter((debt) => !["completed", "cancelled"].includes(debt.status));
   return {
     ...base, schemaVersion: P1_SNAPSHOT_SCHEMA_VERSION,
     english: { words: current(input.wordRecords), reading: current(input.readingRecords) },
     politics: current(input.politicsRecords), outputs: current(input.outputRecords),
-    anki: { pending: anki.filter((card) => card && card.status === "candidate").length, approved: anki.filter((card) => card && card.status === "approved").length },
-    execution: { mode: executionModeStore(input.executionModes).days[date] && executionModeStore(input.executionModes).days[date].mode || "normal", activeDebt: debts.length, overThreeDays: debts.filter((debt) => debt.ageDays > 3).length },
   };
 }
 
 function buildP1ControlMarkdown(snapshot) {
   const base = buildP0ControlMarkdown(snapshot);
-  const missing = (value) => value === null || value === undefined || value === "" ? "未记录" : value;
   const reading = p1FinalArray(snapshot && snapshot.english && snapshot.english.reading);
   const politics = p1FinalArray(snapshot && snapshot.politics);
   const outputs = p1FinalArray(snapshot && snapshot.outputs);
-  return `${base}\n英语单词实际：${snapshot && snapshot.english && snapshot.english.words.length ? snapshot.english.words.length + "条" : "未记录"}\n英语阅读实际：${reading.length ? reading.length + "篇" : "未记录"}\n政治实际：${politics.length ? politics.length + "条" : "未记录"}\n专业课输出：${outputs.length ? outputs.length + "条" : "未记录"}\n执行模式：${missing(snapshot && snapshot.execution && snapshot.execution.mode)}\n当前欠账：${snapshot && snapshot.execution ? snapshot.execution.activeDebt : "未记录"}\nAnki待审核：${snapshot && snapshot.anki ? snapshot.anki.pending : "未记录"}`;
+  return `${base}\n英语单词实际：${snapshot && snapshot.english && snapshot.english.words.length ? snapshot.english.words.length + "条" : "未记录"}\n英语阅读实际：${reading.length ? reading.length + "篇" : "未记录"}\n政治实际：${politics.length ? politics.length + "条" : "未记录"}\n专业课输出：${outputs.length ? outputs.length + "条" : "未记录"}`;
 }

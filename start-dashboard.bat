@@ -13,6 +13,7 @@ if not exist "index.html" (
 )
 
 set PORT=8000
+set API_VERSION=admission-joint-v114
 set PYTHON_CMD=
 
 where python >nul 2>nul
@@ -60,8 +61,31 @@ if not exist "server.py" (
     exit /b 1
 )
 
+if not exist "start-dashboard-preflight.ps1" (
+    echo ERROR: start-dashboard-preflight.ps1 not found.
+    pause
+    exit /b 1
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-dashboard-preflight.ps1" -ExpectedApiVersion "%API_VERSION%"
+
+if errorlevel 10 if not errorlevel 11 goto OPEN_EXISTING
+if errorlevel 12 goto PORT_IN_USE
+
 start "" /b cmd /d /c "timeout /t 1 /nobreak >nul & rundll32 url.dll,FileProtocolHandler http://localhost:%PORT%"
 
 %PYTHON_CMD% server.py
 
 pause
+exit /b 0
+
+:OPEN_EXISTING
+echo Study Dashboard is already running with the current API version.
+start "" rundll32 url.dll,FileProtocolHandler http://localhost:%PORT%
+exit /b 0
+
+:PORT_IN_USE
+echo ERROR: Port %PORT% is being used by another program.
+echo The launcher did not stop that program. Close it manually, then try again.
+pause
+exit /b 1

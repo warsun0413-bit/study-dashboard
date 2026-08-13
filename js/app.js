@@ -7,22 +7,25 @@ function initApp() {
   renderTasks();
   initP0Checkpoint2();
   loadReviewFields();
+  initDailyReviewQuickRecord();
   bindReviewAutoSaving();
   bindTaskControls();
   restorePomodoroStateFromStorage();
   initStudyTime();
   initExamStats();
+  initAdmissionReadiness();
   initP0Final();
   initP1Results();
   initP1Output();
-  initP1Anki();
-  initP1ExecutionDebt();
   initP1Integration();
+  initStudyProgressRunner();
   renderHistory();
   renderRecentSevenDays();
 
   document.querySelector("#saveReviewBtn").addEventListener("click", saveTodayReview);
   document.querySelector("#exportJsonBtn").addEventListener("click", downloadJsonBackup);
+  document.querySelector("#importControlPlanBtn").addEventListener("click", importBuiltInNankaiControlPlan);
+  document.querySelector("#aiTomorrowImportSourceBtn").addEventListener("click", importBuiltInNankaiControlPlan);
   document.querySelector("#importJsonBtn").addEventListener("click", () => document.querySelector("#importJsonInput").click());
   document.querySelector("#importJsonInput").addEventListener("change", (event) => {
     const file = event.target.files && event.target.files[0];
