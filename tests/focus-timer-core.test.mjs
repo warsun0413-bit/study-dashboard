@@ -11,7 +11,7 @@ const at = (value) => new Date(value).getTime();
 
 test("1. v2 state is retained but restored paused without fabricated attribution", () => {
   const state = core.normalizeFocusTimerState({ timerVersion: 2, date: "2026-07-18", mode: "free", currentFocusSeconds: 91, running: true }, { date: "2026-07-18", now: at("2026-07-18T10:00:00") });
-  assert.equal(state.timerVersion, 3);
+  assert.equal(state.timerVersion, 4);
   assert.equal(state.currentFocusSeconds, 91);
   assert.equal(state.running, false);
   assert.equal(state.activeTaskId, "");
@@ -25,6 +25,79 @@ test("2. starting persists the selected task and fixed segment anchor", () => {
   assert.equal(state.activeTaskId, "task-a");
   assert.equal(state.segmentStartedAt, now);
   assert.equal(state.lastHeartbeatAt, now);
+});
+
+test("2a. v3 timer state remains recoverable while gaining an empty context", () => {
+  const now = at("2026-07-18T10:00:00");
+  const state = core.normalizeFocusTimerState({
+    timerVersion: 3,
+    date: "2026-07-18",
+    mode: "pomodoro",
+    activeTaskId: "rolling-review",
+    activeTaskName: "滚动复盘",
+    attribution: "task",
+    roundStartedAt: now - 120_000,
+    segmentStartedAt: now - 60_000,
+    lastHeartbeatAt: now - 1_000,
+    remainingSeconds: 240,
+    currentFocusSeconds: 60,
+    running: true,
+  }, { date: "2026-07-18", now });
+  assert.equal(state.timerVersion, 4);
+  assert.equal(state.activeTaskId, "rolling-review");
+  assert.equal(state.running, true);
+  assert.equal(state.contextKind, "");
+  assert.equal(state.contextId, "");
+});
+
+test("2b. due-review context survives pause and resume without entering ordinary focus", () => {
+  const start = at("2026-07-18T10:00:00");
+  let state = core.startFocusTimerSegment(core.createFocusTimerState({
+    now: start,
+    mode: "pomodoro",
+    remainingSeconds: 300,
+  }), {
+    now: start,
+    activeTaskId: "rolling-review",
+    activeTaskName: "滚动复盘",
+    contextKind: "due-review",
+    contextId: "review-d30-1",
+  });
+  state.lastHeartbeatAt = start + 120_000;
+  const first = core.finalizeFocusTimerSegment(state, { endedAt: start + 120_000, reason: "page-reload" });
+  assert.equal(first.state.contextKind, "due-review");
+  assert.equal(first.state.contextId, "review-d30-1");
+  assert.equal(first.segment.contextKind, "due-review");
+  assert.equal(first.segment.contextId, "review-d30-1");
+  const restored = core.normalizeFocusTimerState(first.state, { date: "2026-07-18", now: start + 180_000 });
+  state = core.startFocusTimerSegment(restored, {
+    now: start + 180_000,
+    activeTaskId: "rolling-review",
+    activeTaskName: "滚动复盘",
+    contextKind: "due-review",
+    contextId: "review-d30-1",
+  });
+  assert.equal(state.contextId, "review-d30-1");
+  const ordinary = core.startFocusTimerSegment(core.createFocusTimerState({
+    ...first.state,
+    running: false,
+  }), { now: start + 180_000, activeTaskId: "plan-722", activeTaskName: "722" });
+  assert.equal(ordinary.contextKind, "");
+  assert.equal(ordinary.contextId, "");
+});
+
+test("2c. incomplete or old review context fails closed", () => {
+  const now = at("2026-07-18T10:00:00");
+  assert.equal(core.createFocusTimerState({ now, contextKind: "due-review" }).contextKind, "");
+  const old = core.normalizeFocusTimerState({
+    timerVersion: 3,
+    date: "2026-07-18",
+    activeTaskId: "rolling-review",
+    contextKind: "due-review",
+    contextId: "review-old",
+  }, { date: "2026-07-18", now });
+  assert.equal(old.contextKind, "");
+  assert.equal(old.contextId, "");
 });
 
 test("3. task A finalization never inherits task B", () => {
@@ -314,6 +387,7 @@ test("27. task mode time and formal-boundary differences prevent history merging
     [base, { ...base, startedAt: "2026-07-18T10:04:00", endedAt: "2026-07-18T10:05:00" }],
     [base, { ...base, reason: "free-focus-ended", startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
     [base, { ...base, wrapupSaved: true, startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
+    [{ ...base, contextKind: "due-review", contextId: "review-a" }, { ...base, contextKind: "due-review", contextId: "review-b", startedAt: "2026-07-18T10:01:30", endedAt: "2026-07-18T10:02:30" }],
   ];
   cases.forEach(([first, second]) => {
     const sessions = [

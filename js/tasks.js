@@ -1210,6 +1210,8 @@ function saveFinalizedFocusSession(segment) {
     taskName: segment.taskName || (task ? task.name : "未归属"),
     taskTime: task ? task.time || "" : "",
     attribution: segment.attribution === "task" ? "task" : "unassigned",
+    contextKind: segment.contextKind === "due-review" ? "due-review" : "",
+    contextId: segment.contextKind === "due-review" ? String(segment.contextId || "").slice(0, 120) : "",
     goal: localStorage.getItem(focusRoundGoalKey) || "",
     startedAt: new Date(segment.startedAt).toISOString(),
     endedAt: new Date(segment.endedAt).toISOString(),
@@ -1220,12 +1222,18 @@ function saveFinalizedFocusSession(segment) {
   return session;
 }
 
-function updateFocusSessionWrapup(sessionId, completed, nextStep) {
+function updateFocusSessionsWrapup(sessionIds, completed, nextStep) {
+  const ids = new Set((Array.isArray(sessionIds) ? sessionIds : [sessionIds]).map((id) => String(id || "")).filter(Boolean));
+  if (!ids.size) return;
   const sessions = readJson(focusSessionsKey, []);
   if (!Array.isArray(sessions)) return;
-  writeJson(focusSessionsKey, sessions.map((session) => session && session.id === sessionId
+  writeJson(focusSessionsKey, sessions.map((session) => session && ids.has(String(session.id || ""))
     ? { ...session, completed, nextStep, wrapupSaved: true }
     : session));
+}
+
+function updateFocusSessionWrapup(sessionId, completed, nextStep) {
+  updateFocusSessionsWrapup([sessionId], completed, nextStep);
 }
 
 function savePomodoroState() {
@@ -1248,14 +1256,19 @@ function restorePomodoroStateFromStorage() {
   if (pomodoroTimerId) window.clearInterval(pomodoroTimerId);
   pomodoroTimerId = null;
   focusTimerState = normalizeFocusTimerState(readJson(focusTimerStateKey, {}), { date: getDateKey() });
+  const restoredReviewId = restorePendingFocusReviewFromTimerState(focusTimerState);
   syncFocusRuntimeFromState();
   if (focusTimerState.running) {
     finalizeFocusSegment({ endedAt: Date.now(), reason: "page-reload" });
     setStatus("#executionStatus", "检测到页面刷新，已结算到最后心跳并暂停；请手动继续。 ");
   }
+  if (restoredReviewId && !isPendingFocusReviewCurrent()) {
+    settleStaleRestoredFocusReview();
+    return;
+  }
   savePomodoroState();
   updatePomodoroDisplay();
-  showFocusRecoveryIfNeeded();
+  if (!showFocusRecoveryIfNeeded()) restorePendingFocusReviewResultCard();
 }
 
 function updatePomodoroDisplay() {
@@ -1418,6 +1431,8 @@ function startPomodoro() {
     date: getDateKey(),
     activeTaskId: taskId,
     activeTaskName: taskName,
+    contextKind: pendingFocusReview ? "due-review" : "",
+    contextId: pendingFocusReview ? pendingFocusReview.reviewId : "",
     resetOverrunPrompt,
   });
   syncFocusRuntimeFromState();
@@ -1594,7 +1609,11 @@ function showFocusRecoveryIfNeeded() {
   if (!task) return false;
   const focusTask = document.querySelector("#focusTask");
   if (focusTask) focusTask.value = task.id;
-  document.querySelector("#focusRecoveryTask").textContent = `${task.time ? `${task.time} · ` : ""}${task.name}`;
+  const reviewState = pendingFocusReview ? getCurrentReviewExecutionState() : null;
+  const recoveryLabel = pendingFocusReview && reviewState && reviewState.active && reviewState.active.reviewId === pendingFocusReview.reviewId
+    ? `复盘 · ${reviewState.active.reviewLevel} · ${reviewState.active.subject} · ${reviewState.active.knowledgeUnit || reviewState.active.task}`
+    : `${task.time ? `${task.time} · ` : ""}${task.name}`;
+  document.querySelector("#focusRecoveryTask").textContent = recoveryLabel;
   const isPomodoro = focusTimingMode === POMODORO_FOCUS_MODE;
   document.querySelector("#focusRecoveryTimeLabel").textContent = isPomodoro ? "本轮剩余" : "本轮已记录";
   document.querySelector("#focusRecoveryTime").textContent = isPomodoro
@@ -2647,6 +2666,78 @@ function getCurrentReviewExecutionState() {
   return getReviewExecutionState(readJson(reviewQueueKey, []), getDateKey(), { task });
 }
 
+function getUnresolvedFocusReviewSessions(reviewId) {
+  const id = String(reviewId || "");
+  const sessions = readJson(focusSessionsKey, []);
+  if (!id || !Array.isArray(sessions)) return [];
+  return sessions.filter((session) => session
+    && session.date === getDateKey()
+    && session.contextKind === "due-review"
+    && String(session.contextId || "") === id
+    && session.wrapupSaved !== true
+    && Number(session.seconds) > 0);
+}
+
+function getFocusReviewSessionSummary(reviewId, fallbackSession = null) {
+  const sessions = getUnresolvedFocusReviewSessions(reviewId);
+  const fallbackId = String(fallbackSession && fallbackSession.id || "");
+  if (fallbackSession && !sessions.some((item) => String(item && item.id || "") === fallbackId)) sessions.push(fallbackSession);
+  const latest = sessions.at(-1) || fallbackSession;
+  return {
+    session: latest ? { ...latest, seconds: sessions.reduce((sum, item) => sum + Math.max(0, Number(item.seconds) || 0), 0) } : null,
+    sessionIds: [...new Set(sessions.map((item) => String(item && item.id || "")).filter(Boolean).concat(fallbackId ? [fallbackId] : []))],
+  };
+}
+
+function restorePendingFocusReviewFromTimerState(state = focusTimerState) {
+  const contextId = state && state.contextKind === "due-review" ? String(state.contextId || "") : "";
+  const task = contextId ? getFocusRecoveryTask() : null;
+  if (!contextId || !task || task.category !== "rollingReview") return "";
+  const summary = getFocusReviewSessionSummary(contextId);
+  pendingFocusReview = {
+    reviewId: contextId,
+    sessionId: String(summary.session && summary.session.id || ""),
+    sessionIds: summary.sessionIds,
+  };
+  return contextId;
+}
+
+function isPendingFocusReviewCurrent() {
+  const state = getCurrentReviewExecutionState();
+  return Boolean(pendingFocusReview && state && state.active && state.active.reviewId === pendingFocusReview.reviewId);
+}
+
+function settleStaleRestoredFocusReview() {
+  const reviewId = String(pendingFocusReview && pendingFocusReview.reviewId || "");
+  const summary = getFocusReviewSessionSummary(reviewId, lastFinalizedFocusSession);
+  updateFocusSessionsWrapup(summary.sessionIds, "复盘结果未保存", "队列已更新，请重新开始当前第一条复盘");
+  pendingFocusReview = null;
+  focusReviewNextReviewId = "";
+  resetFocusRound();
+  if (typeof renderDueReviews === "function") renderDueReviews();
+  renderTasks();
+  setStatus("#executionStatus", "刷新前的复盘身份已失效；专注时间已保留，复盘结果未写入，请重新开始当前第一条。", true);
+}
+
+function restorePendingFocusReviewResultCard() {
+  if (focusRoundStartedAt || currentFocusSeconds > 0 || pendingFocusReview) return false;
+  const sessions = readJson(focusSessionsKey, []);
+  const latest = Array.isArray(sessions) ? sessions.slice().reverse().find((session) => session
+    && session.date === getDateKey()
+    && session.contextKind === "due-review"
+    && String(session.contextId || "")
+    && session.wrapupSaved !== true
+    && Number(session.seconds) > 0) : null;
+  if (!latest) return false;
+  const summary = getFocusReviewSessionSummary(latest.contextId, latest);
+  pendingFocusReview = {
+    reviewId: String(latest.contextId),
+    sessionId: String(summary.session && summary.session.id || ""),
+    sessionIds: summary.sessionIds,
+  };
+  return showFocusReviewResultCard(summary.session);
+}
+
 function startCurrentReviewFromExecution(expectedReviewId) {
   const state = getCurrentReviewExecutionState();
   const reviewId = String(expectedReviewId || "");
@@ -2682,6 +2773,7 @@ function startReviewFiveMinuteRound(review) {
   pendingFocusReview = {
     reviewId,
     sessionId: "",
+    sessionIds: [],
   };
   focusReviewNextReviewId = "";
   setCurrentTask(task.id);
@@ -2725,8 +2817,10 @@ function showFocusReviewResultCard(session) {
   const evidenceStep = document.querySelector("#focusReviewEvidenceStep");
   const handoffStep = document.querySelector("#focusReviewHandoffStep");
   const nextButton = document.querySelector("#focusReviewNextBtn");
-  pendingFocusReview.sessionId = String(session.id || "");
-  document.querySelector("#focusReviewResultDuration").textContent = formatFocusClock(session.seconds || 0);
+  const summary = getFocusReviewSessionSummary(pendingFocusReview.reviewId, session);
+  pendingFocusReview.sessionId = String(summary.session && summary.session.id || session.id || "");
+  pendingFocusReview.sessionIds = summary.sessionIds;
+  document.querySelector("#focusReviewResultDuration").textContent = formatFocusClock(summary.session && summary.session.seconds || session.seconds || 0);
   nextButton.hidden = true;
   focusReviewNextReviewId = "";
   if (!review || review.reviewId !== pendingFocusReview.reviewId) {
@@ -2769,9 +2863,9 @@ function saveFocusReviewResult(resultCode) {
     return;
   }
   const labels = { passed: "通过", partial: "部分通过", failed: "未通过" };
-  if (pendingFocusReview.sessionId) {
-    updateFocusSessionWrapup(
-      pendingFocusReview.sessionId,
+  if (pendingFocusReview.sessionIds.length || pendingFocusReview.sessionId) {
+    updateFocusSessionsWrapup(
+      pendingFocusReview.sessionIds.length ? pendingFocusReview.sessionIds : [pendingFocusReview.sessionId],
       `复盘结果：${labels[resultCode] || resultCode}`,
       validation.evidence.nextAction,
     );
@@ -2800,6 +2894,16 @@ function startNextFocusReview() {
 }
 
 function returnFromFocusReview() {
+  if (pendingFocusReview) {
+    const summary = getFocusReviewSessionSummary(pendingFocusReview.reviewId);
+    updateFocusSessionsWrapup(
+      pendingFocusReview.sessionIds && pendingFocusReview.sessionIds.length ? pendingFocusReview.sessionIds : summary.sessionIds,
+      "复盘结果未保存",
+      "队列已更新，请重新开始当前第一条复盘",
+    );
+    renderTodayFocusOutputs();
+    renderHistory();
+  }
   pendingFocusReview = null;
   focusReviewNextReviewId = "";
   exitFocusMode();
@@ -2808,11 +2912,16 @@ function returnFromFocusReview() {
 }
 
 function deferFocusReviewEvidence() {
-  if (pendingFocusReview && pendingFocusReview.sessionId) {
-    updateFocusSessionWrapup(pendingFocusReview.sessionId, "完成复盘专注", "闭卷证据待补");
+  if (pendingFocusReview && (pendingFocusReview.sessionIds.length || pendingFocusReview.sessionId)) {
+    updateFocusSessionsWrapup(
+      pendingFocusReview.sessionIds.length ? pendingFocusReview.sessionIds : [pendingFocusReview.sessionId],
+      "完成复盘专注",
+      "闭卷证据待补",
+    );
     renderTodayFocusOutputs();
     renderHistory();
   }
+  pendingFocusReview = null;
   setStatus("#dueReviewsStatus", "本轮专注时间已记录；复盘结果仍为未完成，请稍后补齐三行闭卷证据。", true);
   returnFromFocusReview();
 }

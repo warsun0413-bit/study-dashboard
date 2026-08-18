@@ -1,5 +1,6 @@
 // Pure focus-timer state transitions. Storage and DOM updates stay in tasks.js.
-const FOCUS_TIMER_VERSION = 3;
+const FOCUS_TIMER_VERSION = 4;
+const FOCUS_TIMER_COMPATIBLE_VERSIONS = new Set([3, FOCUS_TIMER_VERSION]);
 const FOCUS_HEARTBEAT_GAP_MS = 20_000;
 const FOCUS_INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
 const FOCUS_HISTORY_MERGE_GAP_MS = 2 * 60 * 1000;
@@ -71,10 +72,13 @@ function groupFocusSessionsForHistory(sessions, options = {}) {
     const gap = currentStart - previousEnd;
     const sameTask = Boolean(previousPart && previousPart.taskId)
       && String(previousPart.taskId) === String(cleanSession.taskId || "");
+    const sameContext = String(previousPart && previousPart.contextKind || "") === String(cleanSession.contextKind || "")
+      && String(previousPart && previousPart.contextId || "") === String(cleanSession.contextId || "");
     const canMerge = Boolean(previousPart)
       && previousPart.date === cleanSession.date
       && previousPart.mode === cleanSession.mode
       && sameTask
+      && sameContext
       && FOCUS_LIFECYCLE_REASONS.has(String(previousPart.reason || ""))
       && FOCUS_LIFECYCLE_REASONS.has(String(cleanSession.reason || ""))
       && previousPart.wrapupSaved !== true
@@ -120,6 +124,8 @@ function getFocusDateBoundary(dateKey) {
 function createFocusTimerState(options = {}) {
   const now = toSafeFocusInteger(options.now, Date.now());
   const mode = options.mode === "pomodoro" ? "pomodoro" : "free";
+  const contextId = String(options.contextId || "").slice(0, 120);
+  const contextKind = options.contextKind === "due-review" && contextId ? "due-review" : "";
   return {
     timerVersion: FOCUS_TIMER_VERSION,
     date: options.date || getFocusDateKey(now),
@@ -127,6 +133,8 @@ function createFocusTimerState(options = {}) {
     activeTaskId: String(options.activeTaskId || ""),
     activeTaskName: String(options.activeTaskName || ""),
     attribution: options.attribution === "task" ? "task" : "unassigned",
+    contextKind,
+    contextId: contextKind ? contextId : "",
     roundStartedAt: toSafeFocusInteger(options.roundStartedAt, 0) || null,
     segmentStartedAt: toSafeFocusInteger(options.segmentStartedAt, 0) || null,
     lastHeartbeatAt: toSafeFocusInteger(options.lastHeartbeatAt, 0) || null,
@@ -146,30 +154,33 @@ function normalizeFocusTimerState(rawState, options = {}) {
   const today = options.date || getFocusDateKey(now);
   const isToday = raw.date === today;
   const mode = raw.mode === "pomodoro" ? "pomodoro" : "free";
-  const isV3 = raw.timerVersion === FOCUS_TIMER_VERSION;
+  const isCompatible = FOCUS_TIMER_COMPATIBLE_VERSIONS.has(raw.timerVersion);
+  const hasContext = raw.timerVersion === FOCUS_TIMER_VERSION;
   const state = createFocusTimerState({
     now,
     date: today,
     mode,
-    activeTaskId: isToday && isV3 ? raw.activeTaskId : "",
-    activeTaskName: isToday && isV3 ? raw.activeTaskName : "",
-    attribution: isToday && isV3 ? raw.attribution : "unassigned",
+    activeTaskId: isToday && isCompatible ? raw.activeTaskId : "",
+    activeTaskName: isToday && isCompatible ? raw.activeTaskName : "",
+    attribution: isToday && isCompatible ? raw.attribution : "unassigned",
+    contextKind: isToday && hasContext ? raw.contextKind : "",
+    contextId: isToday && hasContext ? raw.contextId : "",
     roundStartedAt: isToday ? raw.roundStartedAt : null,
-    segmentStartedAt: isToday && isV3 ? raw.segmentStartedAt : null,
-    lastHeartbeatAt: isToday && isV3 ? raw.lastHeartbeatAt : null,
+    segmentStartedAt: isToday && isCompatible ? raw.segmentStartedAt : null,
+    lastHeartbeatAt: isToday && isCompatible ? raw.lastHeartbeatAt : null,
     remainingSeconds: isToday && mode === "pomodoro" ? raw.remainingSeconds : 25 * 60,
     currentFocusSeconds: isToday ? raw.currentFocusSeconds : 0,
-    running: isToday && isV3 ? raw.running : false,
-    pausedReason: isToday && isV3
+    running: isToday && isCompatible ? raw.running : false,
+    pausedReason: isToday && isCompatible
       ? raw.pausedReason
       : isToday && Object.keys(raw).length ? "legacy-state" : "",
-    overrunPromptShown: isToday && isV3 ? raw.overrunPromptShown : false,
+    overrunPromptShown: isToday && isCompatible ? raw.overrunPromptShown : false,
   });
   if (!state.segmentStartedAt || !state.lastHeartbeatAt || state.lastHeartbeatAt < state.segmentStartedAt) {
     state.running = false;
     state.segmentStartedAt = null;
     state.lastHeartbeatAt = null;
-    if (isToday && isV3 && raw.running) state.pausedReason = "invalid-state";
+    if (isToday && isCompatible && raw.running) state.pausedReason = "invalid-state";
   }
   if (state.mode === "pomodoro" && state.remainingSeconds <= 0) state.remainingSeconds = 25 * 60;
   return state;
@@ -183,6 +194,9 @@ function startFocusTimerSegment(state, options = {}) {
   next.activeTaskId = String(options.activeTaskId || "");
   next.activeTaskName = String(options.activeTaskName || "");
   next.attribution = next.activeTaskId ? "task" : "unassigned";
+  next.contextId = String(options.contextId || "").slice(0, 120);
+  next.contextKind = options.contextKind === "due-review" && next.contextId ? "due-review" : "";
+  if (!next.contextKind) next.contextId = "";
   next.roundStartedAt = next.roundStartedAt || now;
   next.segmentStartedAt = now;
   next.lastHeartbeatAt = now;
@@ -239,6 +253,8 @@ function finalizeFocusTimerSegment(state, options = {}) {
     taskId: next.activeTaskId,
     taskName: next.activeTaskName,
     attribution: next.attribution,
+    contextKind: next.contextKind,
+    contextId: next.contextId,
     startedAt,
     endedAt,
     reason,

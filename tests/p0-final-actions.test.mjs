@@ -14,6 +14,7 @@ const p0ResultsSource = fs.readFileSync(new URL("../js/p0-results.js", import.me
 const p1ResultsSource = fs.readFileSync(new URL("../js/p1-results.js", import.meta.url), "utf8");
 const p1OutputSource = fs.readFileSync(new URL("../js/p1-output.js", import.meta.url), "utf8");
 const executionStateSource = fs.readFileSync(new URL("../js/execution-state-core.js", import.meta.url), "utf8");
+const focusTimerSource = fs.readFileSync(new URL("../js/focus-timer-core.js", import.meta.url), "utf8");
 const progressRunnerSource = fs.readFileSync(new URL("../js/progress-runner.js", import.meta.url), "utf8");
 
 test("homepage starts with one execution cockpit and keeps low-frequency information collapsed", () => {
@@ -162,10 +163,10 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-recovery-v143/);
   assert.match(indexSource, /js\/p0-final\.js\?v=execution-brief-v141/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-recovery-v143/);
   assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=execution-brief-v141/);
 });
 
@@ -245,10 +246,10 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.doesNotMatch(tasksSource, /pauseFocusForPageExit\("page-hidden"\)/);
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
-  assert.match(indexSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=background-focus-v118/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
+  assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-recovery-v143/);
+  assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-recovery-v143/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-focus-loop-v142/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-focus-loop-v142/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -434,11 +435,11 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
   assert.match(indexSource, /style\.css\?v=review-focus-loop-v142/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /study-dashboard-review-focus-loop-v142/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-recovery-v143/);
+  assert.match(serviceWorkerSource, /study-dashboard-review-recovery-v143/);
   assert.match(serviceWorkerSource, /style\.css\?v=review-focus-loop-v142/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-focus-loop-v142/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-recovery-v143/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
   assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
   assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
@@ -552,6 +553,28 @@ test("review focus closes directly into evidence result and the next review hand
   assert.match(executionStateSource, /\["mode", "kind", "action", "taskId", "contextId", "taskAction"\]/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-focus-loop-v142/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-focus-loop-v142/);
+});
+
+test("review focus identity and unresolved evidence survive a safe page recovery", () => {
+  assert.match(focusTimerSource, /const FOCUS_TIMER_VERSION = 4/);
+  assert.match(focusTimerSource, /FOCUS_TIMER_COMPATIBLE_VERSIONS = new Set\(\[3, FOCUS_TIMER_VERSION\]\)/);
+  assert.match(focusTimerSource, /contextKind,[\s\S]*contextId: contextKind \? contextId : ""/);
+  assert.match(focusTimerSource, /const hasContext = raw\.timerVersion === FOCUS_TIMER_VERSION/);
+  assert.match(focusTimerSource, /contextKind: next\.contextKind,[\s\S]*contextId: next\.contextId/);
+  assert.match(focusTimerSource, /sameContext[\s\S]*&& sameContext/);
+  assert.match(tasksSource, /function startPomodoro\(\)[\s\S]*contextKind: pendingFocusReview \? "due-review" : ""[\s\S]*contextId: pendingFocusReview \? pendingFocusReview\.reviewId : ""/);
+  assert.match(tasksSource, /function saveFinalizedFocusSession\(segment\)[\s\S]*contextKind: segment\.contextKind === "due-review"[\s\S]*contextId: segment\.contextKind === "due-review"/);
+  assert.match(tasksSource, /function restorePomodoroStateFromStorage\(\)[\s\S]*restorePendingFocusReviewFromTimerState\(focusTimerState\)[\s\S]*isPendingFocusReviewCurrent\(\)[\s\S]*settleStaleRestoredFocusReview\(\)[\s\S]*restorePendingFocusReviewResultCard\(\)/);
+  assert.match(tasksSource, /function getUnresolvedFocusReviewSessions\(reviewId\)[\s\S]*session\.contextKind === "due-review"[\s\S]*session\.wrapupSaved !== true/);
+  assert.match(tasksSource, /function getFocusReviewSessionSummary\(reviewId, fallbackSession = null\)[\s\S]*sessions\.reduce\(\(sum, item\) => sum \+ Math\.max\(0, Number\(item\.seconds\) \|\| 0\), 0\)/);
+  assert.match(tasksSource, /function updateFocusSessionsWrapup\(sessionIds, completed, nextStep\)[\s\S]*ids\.has\(String\(session\.id \|\| ""\)\)[\s\S]*wrapupSaved: true/);
+  assert.match(tasksSource, /function showFocusRecoveryIfNeeded\(\)[\s\S]*reviewState\.active\.reviewId === pendingFocusReview\.reviewId[\s\S]*`复盘 · \$\{reviewState\.active\.reviewLevel\}/);
+  assert.match(tasksSource, /function showFocusReviewResultCard\(session\)[\s\S]*getFocusReviewSessionSummary\(pendingFocusReview\.reviewId, session\)[\s\S]*focusReviewResultDuration/);
+  assert.match(tasksSource, /function returnFromFocusReview\(\)[\s\S]*复盘结果未保存[\s\S]*pendingFocusReview = null/);
+  assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
+  assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-recovery-v143/);
+  assert.match(serviceWorkerSource, /study-dashboard-review-recovery-v143/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {

@@ -311,6 +311,6 @@ test("page and cache expose the manual-confirm rolling workflow", () => {
   assert.match(index, /id="aiRollingWeekCalibration"/);
   assert.match(review, /fetch\("\/api\/ai-week-plan"/);
   assert.match(review, /ai-rolling-week-import-v1/);
-  assert.match(worker, /study-dashboard-review-focus-loop-v142/);
+  assert.match(worker, /study-dashboard-review-recovery-v143/);
   assert.match(worker, /ai-rolling-week-plan-core\.js\?v=capacity-evidence-v132/);
 });
