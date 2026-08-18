@@ -1,6 +1,7 @@
 // v6.0 core-only application bootstrap.
 let scheduleBoundaryRefreshTimerId = null;
 let lastScheduleBoundaryMinuteKey = "";
+let renderedDashboardDateKey = "";
 
 function getScheduleBoundaryMinuteKey(now = new Date()) {
   return `${getDateKey(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -13,8 +14,12 @@ function getNextScheduleBoundaryDelay(nowMilliseconds = Date.now()) {
 
 function refreshScheduleBoundary({ force = false, now = new Date() } = {}) {
   const minuteKey = getScheduleBoundaryMinuteKey(now);
+  const nextDateKey = getDateKey(now);
   if (!force && minuteKey === lastScheduleBoundaryMinuteKey) return false;
-  if (typeof refreshScheduleBoundDashboardUi !== "function" || !refreshScheduleBoundDashboardUi()) return false;
+  const dateChanged = Boolean(renderedDashboardDateKey && renderedDashboardDateKey !== nextDateKey);
+  const refresh = dateChanged ? refreshDashboardForDateRollover : refreshScheduleBoundDashboardUi;
+  if (typeof refresh !== "function" || !refresh()) return false;
+  renderedDashboardDateKey = nextDateKey;
   lastScheduleBoundaryMinuteKey = minuteKey;
   return true;
 }
@@ -28,7 +33,9 @@ function queueNextScheduleBoundaryRefresh() {
 }
 
 function initScheduleBoundaryRefresh() {
-  lastScheduleBoundaryMinuteKey = getScheduleBoundaryMinuteKey();
+  const now = new Date();
+  renderedDashboardDateKey = getDateKey(now);
+  lastScheduleBoundaryMinuteKey = getScheduleBoundaryMinuteKey(now);
   queueNextScheduleBoundaryRefresh();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") refreshScheduleBoundary();

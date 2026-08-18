@@ -557,6 +557,31 @@ function refreshScheduleBoundDashboardUi() {
   return true;
 }
 
+function resetDateScopedExecutionUi() {
+  resultHandoffReceipt = null;
+  lastFinalizedFocusSession = null;
+  activeExecutionSurfaceSnapshot = null;
+  activeResultHandoffModel = null;
+  focusReviewNextReviewId = "";
+}
+
+function refreshDashboardForDateRollover() {
+  if (isExecutionSurfaceFocusProtected()) return false;
+  rollCurrentDetailedPlanWindow();
+  resetDateScopedExecutionUi();
+  updateTodayDate();
+  renderTasks();
+  if (typeof loadReviewFields === "function") loadReviewFields();
+  if (typeof renderDueReviews === "function") renderDueReviews();
+  if (typeof renderManualStudyRecords === "function") renderManualStudyRecords();
+  if (typeof renderStudyTimeSummary === "function") renderStudyTimeSummary();
+  if (typeof renderOutputRecords === "function") renderOutputRecords();
+  if (typeof renderP1WeeklyStats === "function") renderP1WeeklyStats();
+  if (typeof renderHistory === "function") renderHistory();
+  if (typeof renderRecentSevenDays === "function") renderRecentSevenDays();
+  return true;
+}
+
 function getResultHandoffModel(executionSnapshot = activeExecutionSurfaceSnapshot || getExecutionSurfaceSnapshot()) {
   if (!resultHandoffReceipt) {
     return { ...createResultHandoffModel({ receipt: null, task: null }), task: null, executionSnapshot };
@@ -1532,6 +1557,9 @@ function handleFocusHeartbeat() {
     focusTimerState.pausedReason = "date-rollover";
     savePomodoroState();
     setStatus("#executionStatus", "已在跨日边界结算昨天专注；今天计时从0开始，请手动启动。 ");
+    if (typeof refreshScheduleBoundary === "function") {
+      window.setTimeout(() => refreshScheduleBoundary({ force: true }), 0);
+    }
     return;
   }
   if (now - focusTimerState.lastHeartbeatAt > FOCUS_HEARTBEAT_GAP_MS) {

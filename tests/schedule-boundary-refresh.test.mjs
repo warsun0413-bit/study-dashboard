@@ -32,8 +32,46 @@ test("the app refreshes on minute ticks and when a stale page returns to the for
   assert.match(appSource, /renderRecentSevenDays\(\);\s*initScheduleBoundaryRefresh\(\);/);
 });
 
+test("a changed calendar date uses the full rollover before any light refresh", () => {
+  assert.match(appSource, /let renderedDashboardDateKey = ""/);
+  assert.match(appSource, /const nextDateKey = getDateKey\(now\)/);
+  assert.match(appSource, /const dateChanged = Boolean\(renderedDashboardDateKey && renderedDashboardDateKey !== nextDateKey\)/);
+  assert.match(appSource, /const refresh = dateChanged \? refreshDashboardForDateRollover : refreshScheduleBoundDashboardUi/);
+  assert.match(appSource, /if \(typeof refresh !== "function" \|\| !refresh\(\)\) return false;\s*renderedDashboardDateKey = nextDateKey/);
+});
+
+test("a protected date rollover remains pending until the full refresh succeeds", () => {
+  const functionSource = appSource.match(/function refreshScheduleBoundary\(\{ force = false, now = new Date\(\) \} = \{\}\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(functionSource);
+  const calls = [];
+  const context = vm.createContext({
+    getScheduleBoundaryMinuteKey: () => "2026-08-19T00:00",
+    getDateKey: () => "2026-08-19",
+    refreshDashboardForDateRollover: () => {
+      calls.push("rollover");
+      return context.rolloverAllowed;
+    },
+    refreshScheduleBoundDashboardUi: () => {
+      calls.push("light");
+      return true;
+    },
+    renderedDashboardDateKey: "2026-08-18",
+    lastScheduleBoundaryMinuteKey: "2026-08-18T23:59",
+    rolloverAllowed: false,
+  });
+  vm.runInContext(`${functionSource}\nthis.refreshBoundary = refreshScheduleBoundary;`, context);
+  assert.equal(context.refreshBoundary({ force: true }), false);
+  assert.equal(context.renderedDashboardDateKey, "2026-08-18");
+  assert.equal(context.lastScheduleBoundaryMinuteKey, "2026-08-18T23:59");
+  context.rolloverAllowed = true;
+  assert.equal(context.refreshBoundary({ force: true }), true);
+  assert.equal(context.renderedDashboardDateKey, "2026-08-19");
+  assert.equal(context.lastScheduleBoundaryMinuteKey, "2026-08-19T00:00");
+  assert.deepEqual(calls, ["rollover", "rollover"]);
+});
+
 test("automatic schedule refresh is read-only and waits for an active focus round", () => {
-  const refreshBlock = sourceBlock(tasksSource, "function refreshScheduleBoundDashboardUi", "function getResultHandoffModel");
+  const refreshBlock = sourceBlock(tasksSource, "function refreshScheduleBoundDashboardUi", "function resetDateScopedExecutionUi");
   assert.match(refreshBlock, /if \(isExecutionSurfaceFocusProtected\(\)\) return false/);
   assert.match(refreshBlock, /updateCompletionRate\(\)/);
   assert.match(refreshBlock, /renderFocusTaskOptions\(\)/);
@@ -41,6 +79,38 @@ test("automatic schedule refresh is read-only and waits for an active focus roun
   assert.match(refreshBlock, /syncDueReviewScheduleGateUi\(getTodayPlan\(\)\)/);
   assert.match(refreshBlock, /renderDailyCloseout\(\)/);
   assert.doesNotMatch(refreshBlock, /writeJson|localStorage\.setItem|saveTodayPlan|setTaskStatus|renderTasks\(|renderDueReviews\(/);
+});
+
+test("date rollover rolls the formal plan first and refreshes every date-bound view", () => {
+  const rolloverBlock = sourceBlock(tasksSource, "function resetDateScopedExecutionUi", "function getResultHandoffModel");
+  const calls = [];
+  const context = vm.createContext({
+    isExecutionSurfaceFocusProtected: () => context.focusProtected,
+    rollCurrentDetailedPlanWindow: () => calls.push("roll-plan"),
+    updateTodayDate: () => calls.push("date"),
+    renderTasks: () => calls.push("tasks"),
+    loadReviewFields: () => calls.push("review-fields"),
+    renderDueReviews: () => calls.push("due-reviews"),
+    renderManualStudyRecords: () => calls.push("study-records"),
+    renderStudyTimeSummary: () => calls.push("study-summary"),
+    renderOutputRecords: () => calls.push("output-records"),
+    renderP1WeeklyStats: () => calls.push("weekly"),
+    renderHistory: () => calls.push("history"),
+    renderRecentSevenDays: () => calls.push("recent"),
+    focusProtected: true,
+  });
+  vm.runInContext(`${rolloverBlock}\nthis.refreshDate = refreshDashboardForDateRollover;`, context);
+  assert.equal(context.refreshDate(), false);
+  assert.deepEqual(calls, []);
+  context.focusProtected = false;
+  assert.equal(context.refreshDate(), true);
+  assert.deepEqual(calls, [
+    "roll-plan", "date", "tasks", "review-fields", "due-reviews", "study-records",
+    "study-summary", "output-records", "weekly", "history", "recent",
+  ]);
+  assert.ok(calls.indexOf("roll-plan") < calls.indexOf("tasks"));
+  assert.doesNotMatch(rolloverBlock, /saveTodayPlan|writeHistory|clearLearningData|location\.reload/);
+  assert.match(tasksSource, /reason: "date-rollover"[\s\S]*refreshScheduleBoundary\(\{ force: true \}\)/);
 });
 
 test("review gate refresh updates controls in place without erasing evidence", () => {
@@ -54,11 +124,11 @@ test("review gate refresh updates controls in place without erasing evidence", (
 });
 
 test("schedule refresh assets share one cache contract", () => {
-  assert.match(indexSource, /js\/app\.js\?v=schedule-boundary-refresh-v152/);
-  assert.match(indexSource, /js\/tasks\.js\?v=schedule-boundary-refresh-v152/);
-  assert.match(indexSource, /js\/p0-results\.js\?v=schedule-boundary-refresh-v152/);
-  assert.match(serviceWorkerSource, /study-dashboard-schedule-boundary-refresh-v152/);
-  assert.match(serviceWorkerSource, /js\/app\.js\?v=schedule-boundary-refresh-v152/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-boundary-refresh-v152/);
-  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=schedule-boundary-refresh-v152/);
+  assert.match(indexSource, /js\/app\.js\?v=safe-date-rollover-v153/);
+  assert.match(indexSource, /js\/tasks\.js\?v=safe-date-rollover-v153/);
+  assert.match(indexSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /study-dashboard-safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /js\/app\.js\?v=safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
 });
