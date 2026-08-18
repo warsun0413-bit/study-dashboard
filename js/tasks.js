@@ -545,6 +545,18 @@ function renderTasks() {
   renderResultHandoff();
 }
 
+function refreshScheduleBoundDashboardUi() {
+  if (isExecutionSurfaceFocusProtected()) return false;
+  updateTodayDate();
+  updateCompletionRate();
+  renderFocusTaskOptions();
+  if (typeof renderP0FinalHome === "function") renderP0FinalHome();
+  if (typeof syncDueReviewScheduleGateUi === "function") syncDueReviewScheduleGateUi(getTodayPlan());
+  if (typeof renderDailyCloseout === "function") renderDailyCloseout();
+  renderResultHandoff();
+  return true;
+}
+
 function getResultHandoffModel(executionSnapshot = activeExecutionSurfaceSnapshot || getExecutionSurfaceSnapshot()) {
   if (!resultHandoffReceipt) {
     return { ...createResultHandoffModel({ receipt: null, task: null }), task: null, executionSnapshot };

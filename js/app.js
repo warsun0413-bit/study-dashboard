@@ -1,4 +1,41 @@
 // v6.0 core-only application bootstrap.
+let scheduleBoundaryRefreshTimerId = null;
+let lastScheduleBoundaryMinuteKey = "";
+
+function getScheduleBoundaryMinuteKey(now = new Date()) {
+  return `${getDateKey(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function getNextScheduleBoundaryDelay(nowMilliseconds = Date.now()) {
+  const elapsedInMinute = ((Number(nowMilliseconds) % 60000) + 60000) % 60000;
+  return 60000 - elapsedInMinute + 75;
+}
+
+function refreshScheduleBoundary({ force = false, now = new Date() } = {}) {
+  const minuteKey = getScheduleBoundaryMinuteKey(now);
+  if (!force && minuteKey === lastScheduleBoundaryMinuteKey) return false;
+  if (typeof refreshScheduleBoundDashboardUi !== "function" || !refreshScheduleBoundDashboardUi()) return false;
+  lastScheduleBoundaryMinuteKey = minuteKey;
+  return true;
+}
+
+function queueNextScheduleBoundaryRefresh() {
+  if (scheduleBoundaryRefreshTimerId !== null) window.clearTimeout(scheduleBoundaryRefreshTimerId);
+  scheduleBoundaryRefreshTimerId = window.setTimeout(() => {
+    refreshScheduleBoundary();
+    queueNextScheduleBoundaryRefresh();
+  }, getNextScheduleBoundaryDelay());
+}
+
+function initScheduleBoundaryRefresh() {
+  lastScheduleBoundaryMinuteKey = getScheduleBoundaryMinuteKey();
+  queueNextScheduleBoundaryRefresh();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshScheduleBoundary();
+  });
+  window.addEventListener("pageshow", () => refreshScheduleBoundary());
+}
+
 function initApp() {
   runDataMigrations({ source: "app-start", todayKey: getDateKey() });
   ensureDataSchema();
@@ -21,6 +58,7 @@ function initApp() {
   initStudyProgressRunner();
   renderHistory();
   renderRecentSevenDays();
+  initScheduleBoundaryRefresh();
 
   document.querySelector("#saveReviewBtn").addEventListener("click", saveTodayReview);
   document.querySelector("#exportJsonBtn").addEventListener("click", downloadJsonBackup);

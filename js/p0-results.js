@@ -420,6 +420,19 @@ function getCurrentReviewScheduleGate(plan, now = new Date()) {
   return getReviewScheduleGate(task, { nowMinutes, cutoffMinutes: schedule.cutoffMinutes });
 }
 
+function syncDueReviewScheduleGateUi(plan, now = new Date()) {
+  const reviewGate = getCurrentReviewScheduleGate(plan, now);
+  document.querySelectorAll(".review-schedule-gate").forEach((message) => {
+    message.className = `review-schedule-gate is-${reviewGate.state}`;
+    message.textContent = reviewGate.message;
+  });
+  document.querySelectorAll("[data-review-start]").forEach((button) => {
+    button.disabled = !reviewGate.allowed;
+    button.title = reviewGate.allowed ? "" : reviewGate.message;
+  });
+  return reviewGate;
+}
+
 function validateRollingReviewCompletion(task, queue, today) {
   if (!task || task.category !== "rollingReview") return { valid: true, message: "" };
   const state = getReviewExecutionState(queue, today, { task });
@@ -1157,7 +1170,7 @@ function handleDueReviewClick(event) {
     const plan = typeof getTodayPlan === "function" ? getTodayPlan() : null;
     const reviewGate = getCurrentReviewScheduleGate(plan);
     if (!reviewGate.allowed) {
-      renderDueReviews();
+      syncDueReviewScheduleGateUi(plan);
       return setStatus("#dueReviewsStatus", reviewGate.message, true);
     }
     const queue = normalizeReviewQueueRecords(readJson(reviewQueueKey, []));
