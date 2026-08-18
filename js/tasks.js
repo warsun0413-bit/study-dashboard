@@ -2132,27 +2132,40 @@ function getDailyExecutionGapTomorrowAction(task, fallback) {
   return exactAction || fallback;
 }
 
-function buildDailyExecutionScheduleAnchors(plan = getTodayPlan()) {
+function buildDailyExecutionScheduleAnchors(plan = getTodayPlan(), gapItems = []) {
   const tasks = Array.isArray(plan && plan.tasks) ? plan.tasks : [];
+  const trackedByTaskId = new Map((Array.isArray(gapItems) ? gapItems : [])
+    .filter((item) => item && item.taskId)
+    .map((item) => [String(item.taskId), item]));
   return tasks
-    .filter((task) => task && (typeof isExecutablePlanTask === "function"
-      ? isExecutablePlanTask(task)
-      : !["completed", "skipped", "cancelled"].includes(getTaskStatus(task))))
+    .filter((task) => {
+      if (!task) return false;
+      const executable = typeof isExecutablePlanTask === "function"
+        ? isExecutablePlanTask(task)
+        : !["completed", "skipped", "cancelled"].includes(getTaskStatus(task));
+      const trackedReview = task.category === "rollingReview" && trackedByTaskId.get(String(task.id));
+      return executable || Boolean(trackedReview && trackedReview.complete !== true);
+    })
     .map((task) => {
       const startMinutes = getPlanTaskBoundaryMinutes(task, "start", Number.NaN);
       const endMinutes = getPlanTaskBoundaryMinutes(task, "end", Number.NaN);
       if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) return null;
+      const tracked = trackedByTaskId.get(String(task.id)) || null;
+      const isReview = task.category === "rollingReview";
       return {
-        key: String(task.sourceTaskKey || task.category || task.id),
+        ...(tracked || {}),
+        key: String((tracked && tracked.key) || task.sourceTaskKey || task.category || task.id),
         taskId: task.id,
-        label: task.name || "下一项任务",
+        label: (tracked && tracked.label) || task.name || "下一项任务",
         complete: false,
         isProtectedAnchor: true,
         startMinutes,
         endMinutes,
-        transitionMinutes: 15,
+        transitionMinutes: isReview ? 0 : 15,
         minimumBlockMinutes: 5,
-        anchorDescription: `按计划进入${task.name || "下一项任务"}时间块；先完成本时间块的明确起点，之前的欠账在本时间块结束后继续处理。`,
+        anchorDescription: isReview && tracked
+          ? `${tracked.description} ${tracked.startAction || ""}`.trim()
+          : `按计划进入${task.name || "下一项任务"}时间块；先完成本时间块的明确起点，之前的欠账在本时间块结束后继续处理。`,
       };
     })
     .filter(Boolean);
@@ -2282,7 +2295,7 @@ function getDailyExecutionTakeover(plan = getTodayPlan(), options = {}) {
   const now = new Date();
   const schedule = getNightExecutionSchedule(plan, now);
   const items = buildDailyExecutionGapItems(plan);
-  const anchors = buildDailyExecutionScheduleAnchors(plan);
+  const anchors = buildDailyExecutionScheduleAnchors(plan, items);
   const englishItem = items.find((item) => item.key === "english");
   const englishTask = englishItem && plan.tasks.find((task) => task.id === englishItem.taskId);
   const englishRecord = englishTask && typeof getP1EnglishState === "function"
@@ -2320,15 +2333,34 @@ function getExecutionGapSurfaceView(takeover) {
   const config = getUnifiedTaskPrimary(task, getTaskStatus(task));
   const anchorState = String(gap.anchorState || "");
   const anchorProtected = ["upcoming", "prepare", "active"].includes(anchorState);
+  const reviewWaiting = task.category === "rollingReview" && anchorState === "upcoming";
+  const taskStartLabel = String(task.time || "").split(/[—–-]/)[0].trim();
   const anchorMeta = anchorState === "active"
     ? `时间块进行中 · ${task.time || "计划时间待定"}`
     : anchorState === "prepare"
       ? `时间块准备 · ${task.time || "计划时间待定"}`
       : `切换保护 · 距下一时间块不足${Math.max(1, Number(gap.availableMinutes) || 1)}分钟`;
   const anchorTitle = anchorState === "active" ? `现在做：${gap.label}` : `准备：${gap.label}`;
-  const anchorDescription = anchorState === "upcoming"
-    ? `距离${gap.label}准备窗口已不足一个5分钟最小块，不再开启上一时间块的欠账。${startAction}`
+  const anchorDescription = reviewWaiting
+    ? `距离复盘时间不足一个5分钟最小块；不再开启其他欠账，${taskStartLabel || "到时"}再开始今日复盘。`
+    : anchorState === "upcoming"
+      ? `距离${gap.label}准备窗口已不足一个5分钟最小块，不再开启上一时间块的欠账。${startAction}`
     : `${gap.anchorDescription || gap.description}${startAction}`;
+  const primary = reviewWaiting ? {
+    label: taskStartLabel ? `等待 ${taskStartLabel}` : "等待复盘时间",
+    action: "",
+    className: "ghost",
+    disabled: true,
+  } : {
+    label: config.action === "unified-start"
+      ? anchorProtected ? `开始${gap.label} 5分钟` : "先补5分钟"
+      : config.action === "unified-review" ? config.label : "补齐正式结果",
+    action: "execution-gap-action",
+    delegateAction: config.action,
+    taskId: task.id,
+    contextId: config.contextId,
+    className: "primary",
+  };
   return createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.EXECUTION_GAP,
     taskId: task.id,
@@ -2344,16 +2376,7 @@ function getExecutionGapSurfaceView(takeover) {
       : night
       ? `${gap.description}${startAction} 先做5分钟；需要时只继续一个25分钟闭环。`
       : `${gap.description}${startAction}`,
-    primary: {
-      label: config.action === "unified-start"
-        ? anchorProtected ? `开始${gap.label} 5分钟` : "先补5分钟"
-        : config.action === "unified-review" ? config.label : "补齐正式结果",
-      action: "execution-gap-action",
-      delegateAction: config.action,
-      taskId: task.id,
-      contextId: config.contextId,
-      className: "primary",
-    },
+    primary,
   });
 }
 
@@ -2804,6 +2827,15 @@ function startReviewFocusRound(review, options = {}) {
     setStatus("#dueReviewsStatus", "已有未结束的专注轮，请先继续或结束当前专注，避免重复计时。", true);
     return false;
   }
+  const plan = getTodayPlan();
+  const reviewGate = typeof getCurrentReviewScheduleGate === "function"
+    ? getCurrentReviewScheduleGate(plan)
+    : { allowed: false, message: "当前无法核验复盘时间，请刷新页面后重试。" };
+  if (!reviewGate.allowed) {
+    setStatus("#dueReviewsStatus", reviewGate.message, true);
+    setStatus("#executionStatus", reviewGate.message, true);
+    return false;
+  }
   const state = getCurrentReviewExecutionState();
   const reviewId = String(review && review.reviewId || "");
   if (!state || !state.active || !reviewId || state.active.reviewId !== reviewId) {
@@ -2812,7 +2844,6 @@ function startReviewFocusRound(review, options = {}) {
     setStatus("#dueReviewsStatus", "复盘队列已经更新，请确认当前第一条后再开始。", true);
     return false;
   }
-  const plan = getTodayPlan();
   const task = plan.tasks.find((item) => item && item.category === "rollingReview");
   if (!task) {
     setStatus("#dueReviewsStatus", "今日计划中没有滚动复盘时间块，当前数据无法启动计时。", true);

@@ -86,9 +86,9 @@ test("built-in import is visible, wired through preview, and cached", () => {
   assert.match(safetySource, /importNankaiPlan\(NANKAI_CONTROL_PLAN_20260806\)/);
   assert.match(safetySource, /\n\s+detailedPlanDates,/);
   assert.match(safetySource, /typeof renderAiTomorrowPlanPreview === "function"/);
-  assert.match(serviceWorkerSource, /study-dashboard-schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /study-dashboard-review-schedule-gate-v151/);
   assert.match(serviceWorkerSource, /data-safety\.js\?v=admission-joint-v114/);
   assert.match(serviceWorkerSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
   assert.match(serviceWorkerSource, /plan-window-core\.js\?v=next-task-order-v146/);
-  assert.match(serviceWorkerSource, /tasks\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /tasks\.js\?v=review-schedule-gate-v151/);
 });

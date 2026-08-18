@@ -174,6 +174,24 @@ test("completed, blocked, or inspected schedule anchors never mutate execution f
   assert.equal(JSON.stringify({ items, anchors }), before);
 });
 
+test("review anchor waits until 20:40 and then owns its scheduled block", () => {
+  const items = [
+    { key: "722", taskId: "722", complete: false, priority: 20, deadlineMinutes: 10 * 60 + 35, minimumBlockMinutes: 5 },
+    { key: "review", taskId: "review", complete: false, priority: 40, deadlineMinutes: 21 * 60, minimumBlockMinutes: 5 },
+  ];
+  const anchors = [{
+    key: "review", taskId: "review", label: "今日复盘预算", complete: false,
+    startMinutes: 20 * 60 + 40, endMinutes: 21 * 60, transitionMinutes: 0,
+  }];
+  const waiting = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 20 * 60 + 36, anchors, minimumBlockMinutes: 5 }));
+  assert.equal(waiting.key, "review");
+  assert.equal(waiting.anchorState, "upcoming");
+  assert.equal(waiting.availableMinutes, 4);
+  const active = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 20 * 60 + 40, anchors }));
+  assert.equal(active.key, "review");
+  assert.equal(active.anchorState, "active");
+});
+
 test("night stop keeps at most one professional product and one English-or-politics support task", () => {
   const items = [
     { key: "english", taskId: "english", complete: false, priority: 10 },

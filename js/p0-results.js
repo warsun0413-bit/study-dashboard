@@ -356,6 +356,70 @@ function getReviewWorkloadForPlan(queue, today, plan) {
   return getReviewExecutionState(queue, today, { task });
 }
 
+function getReviewScheduleGate(task, options = {}) {
+  const match = String(task && task.time || "").match(/(\d{1,2}):(\d{2})\s*[—–-]\s*(\d{1,2}):(\d{2})/);
+  const nowMinutes = Number(options.nowMinutes);
+  const cutoffMinutes = Number(options.cutoffMinutes);
+  if (!match || !Number.isFinite(nowMinutes)) {
+    return {
+      allowed: false,
+      state: "unavailable",
+      startMinutes: null,
+      endMinutes: null,
+      message: "今日计划中没有可核验的复盘时间块，暂不启动新的复盘专注。",
+    };
+  }
+  const startMinutes = Number(match[1]) * 60 + Number(match[2]);
+  const endMinutes = Number(match[3]) * 60 + Number(match[4]);
+  const startLabel = `${String(match[1]).padStart(2, "0")}:${match[2]}`;
+  if (endMinutes <= startMinutes) {
+    return {
+      allowed: false,
+      state: "unavailable",
+      startMinutes,
+      endMinutes,
+      message: "复盘时间块跨日或无效，暂不启动新的复盘专注。",
+    };
+  }
+  if (Number.isFinite(cutoffMinutes) && nowMinutes >= cutoffMinutes) {
+    return {
+      allowed: false,
+      state: "closed",
+      startMinutes,
+      endMinutes,
+      message: "已到晚间止损时间；今天不再开启新的复盘专注。",
+    };
+  }
+  if (nowMinutes < startMinutes) {
+    return {
+      allowed: false,
+      state: "waiting",
+      startMinutes,
+      endMinutes,
+      message: `复盘入口将在 ${startLabel} 开放；当前先按时间表完成正在进行的任务。`,
+    };
+  }
+  return {
+    allowed: true,
+    state: nowMinutes < endMinutes ? "active" : "catch-up",
+    startMinutes,
+    endMinutes,
+    message: nowMinutes < endMinutes
+      ? "复盘时间块进行中；可以开始5分钟或直接自由专注。"
+      : "复盘原时间块已结束；晚间止损前仍可补做。",
+  };
+}
+
+function getCurrentReviewScheduleGate(plan, now = new Date()) {
+  const tasks = plan && Array.isArray(plan.tasks) ? plan.tasks : [];
+  const task = tasks.find((item) => item && item.category === "rollingReview") || null;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const schedule = typeof getNightExecutionSchedule === "function"
+    ? getNightExecutionSchedule(plan, now)
+    : { cutoffMinutes: (plan && plan.template === "sunday") || now.getDay() === 0 ? 20 * 60 + 30 : 21 * 60 + 40 };
+  return getReviewScheduleGate(task, { nowMinutes, cutoffMinutes: schedule.cutoffMinutes });
+}
+
 function validateRollingReviewCompletion(task, queue, today) {
   if (!task || task.category !== "rollingReview") return { valid: true, message: "" };
   const state = getReviewExecutionState(queue, today, { task });
@@ -899,6 +963,7 @@ function renderDueReviews() {
   const plan = typeof getTodayPlan === "function" ? getTodayPlan() : null;
   const reviewTask = plan && Array.isArray(plan.tasks) ? plan.tasks.find((task) => task && task.category === "rollingReview") : null;
   const state = getReviewExecutionState(readJson(reviewQueueKey, []), today, { task: reviewTask });
+  const reviewGate = getCurrentReviewScheduleGate(plan);
   container.replaceChildren();
   document.querySelector("#dueReviewsCount").textContent = state.totalCount
     ? `今日预算 ${state.completedCount} / ${state.totalCount} · 待做 ${state.remainingCount} · 历史积压 ${state.backlogCount}`
@@ -929,19 +994,26 @@ function renderDueReviews() {
   title.textContent = `${review.reviewLevel} · ${review.subject} · ${review.knowledgeUnit || review.task}`;
   const meta = document.createElement("span");
   meta.textContent = `${review.dueDate < today ? `已逾期 · 原定 ${review.dueDate}` : "今日到期"} · ${review.task}`;
-  content.append(marker, title, meta);
+  const scheduleGate = document.createElement("p");
+  scheduleGate.className = `review-schedule-gate is-${reviewGate.state}`;
+  scheduleGate.textContent = reviewGate.message;
+  content.append(marker, title, meta, scheduleGate);
   const start = document.createElement("button");
   start.type = "button";
   start.className = "button primary review-start-button";
   start.textContent = "开始5分钟遮挡复述";
   start.dataset.reviewStart = review.reviewId;
   start.dataset.reviewFocusMode = "five-minute";
+  start.disabled = !reviewGate.allowed;
+  start.title = reviewGate.allowed ? "" : reviewGate.message;
   const freeFocus = document.createElement("button");
   freeFocus.type = "button";
   freeFocus.className = "button secondary review-free-focus-button";
   freeFocus.textContent = "直接自由专注";
   freeFocus.dataset.reviewStart = review.reviewId;
   freeFocus.dataset.reviewFocusMode = "free";
+  freeFocus.disabled = !reviewGate.allowed;
+  freeFocus.title = reviewGate.allowed ? "" : reviewGate.message;
   const startActions = document.createElement("div");
   startActions.className = "button-row review-start-actions";
   startActions.append(start, freeFocus);
@@ -1082,6 +1154,12 @@ function handleDueReviewClick(event) {
   const start = event.target.closest("[data-review-start]");
   const move = event.target.closest("[data-review-reschedule]");
   if (start) {
+    const plan = typeof getTodayPlan === "function" ? getTodayPlan() : null;
+    const reviewGate = getCurrentReviewScheduleGate(plan);
+    if (!reviewGate.allowed) {
+      renderDueReviews();
+      return setStatus("#dueReviewsStatus", reviewGate.message, true);
+    }
     const queue = normalizeReviewQueueRecords(readJson(reviewQueueKey, []));
     const review = queue.find((item) => item.reviewId === start.dataset.reviewStart);
     const directFree = start.dataset.reviewFocusMode === "free";

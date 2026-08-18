@@ -20,6 +20,7 @@ globalThis.api = {
   getReviewTaskBudgetMinutes,
   getReviewExecutionState,
   getReviewWorkloadForPlan,
+  getReviewScheduleGate,
   validateRollingReviewCompletion,
   normalizeProfessionalResultsStore,
   validateProfessionalUnit,
@@ -83,6 +84,19 @@ assert.equal(context.api.getReviewTaskBudgetMinutes({ category: "rollingReview",
 assert.equal(context.api.getReviewTaskBudgetMinutes({ task: { category: "rollingReview", time: "20:20—20:50" } }), 30);
 assert.equal(context.api.getReviewTaskBudgetMinutes({ task: { category: "rollingReview", time: "14:00—14:40" } }), 40);
 assert.equal(context.api.getReviewTaskBudgetMinutes({ task: { category: "rollingReview", time: "14:00—16:00" } }), 45);
+
+const reviewTask = { category: "rollingReview", time: "20:40—21:00" };
+assert.deepEqual(
+  JSON.parse(JSON.stringify(context.api.getReviewScheduleGate(reviewTask, { nowMinutes: 20 * 60, cutoffMinutes: 21 * 60 + 40 }))),
+  { allowed: false, state: "waiting", startMinutes: 1240, endMinutes: 1260, message: "复盘入口将在 20:40 开放；当前先按时间表完成正在进行的任务。" },
+);
+assert.equal(context.api.getReviewScheduleGate(reviewTask, { nowMinutes: 20 * 60 + 40, cutoffMinutes: 21 * 60 + 40 }).state, "active");
+assert.equal(context.api.getReviewScheduleGate(reviewTask, { nowMinutes: 21 * 60, cutoffMinutes: 21 * 60 + 40 }).state, "catch-up");
+assert.deepEqual(
+  JSON.parse(JSON.stringify(context.api.getReviewScheduleGate(reviewTask, { nowMinutes: 21 * 60 + 40, cutoffMinutes: 21 * 60 + 40 }))),
+  { allowed: false, state: "closed", startMinutes: 1240, endMinutes: 1260, message: "已到晚间止损时间；今天不再开启新的复盘专注。" },
+);
+assert.equal(context.api.getReviewScheduleGate({ category: "rollingReview", time: "待定" }, { nowMinutes: 1240, cutoffMinutes: 1300 }).allowed, false);
 
 const budgetQueue = Array.from({ length: 10 }, (_, index) => ({
   reviewId: `budget-${index}`,

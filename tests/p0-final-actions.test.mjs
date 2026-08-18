@@ -158,23 +158,26 @@ test("all executable schedule blocks protect their transitions without stored re
   const anchors = tasksSource.slice(tasksSource.indexOf("function buildDailyExecutionScheduleAnchors"), tasksSource.indexOf("function buildDailyExecutionGapItems"));
   const takeover = tasksSource.slice(tasksSource.indexOf("function getDailyExecutionTakeover"), tasksSource.indexOf("function resetExecutionSurfaceLayers"));
   assert.match(anchors, /isExecutablePlanTask\(task\)/);
+  assert.match(anchors, /task\.category === "rollingReview"/);
+  assert.match(anchors, /trackedReview\.complete !== true/);
   assert.match(anchors, /isProtectedAnchor: true/);
-  assert.match(anchors, /transitionMinutes: 15/);
+  assert.match(anchors, /transitionMinutes: isReview \? 0 : 15/);
   assert.match(anchors, /minimumBlockMinutes: 5/);
   assert.match(anchors, /之前的欠账在本时间块结束后继续处理/);
   assert.match(takeover, /getAnchorAwareDailyExecutionGap/);
-  assert.match(takeover, /buildDailyExecutionScheduleAnchors\(plan\)/);
+  assert.match(takeover, /buildDailyExecutionScheduleAnchors\(plan, items\)/);
   assert.match(takeover, /anchors,/);
   assert.match(takeover, /时间块准备/);
   assert.match(takeover, /时间块进行中/);
   assert.match(takeover, /开始\$\{gap\.label\} 5分钟/);
+  assert.match(takeover, /reviewWaiting[\s\S]*等待 \$\{taskStartLabel\}[\s\S]*disabled: true/);
   assert.doesNotMatch(takeover, /距离英语阅读准备窗口/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=schedule-transition-v149/);
-  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
   assert.match(indexSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=schedule-transition-v149/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
   assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
 });
 
@@ -255,11 +258,11 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
-  assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
-  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
+  assert.match(indexSource, /js\/p0-results\.js\?v=review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-schedule-gate-v151/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
 });
 
@@ -451,13 +454,13 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="resultHandoffBrief"/);
   assert.match(indexSource, /id="focusModeExecutionBrief"/);
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
-  assert.match(indexSource, /style\.css\?v=next-task-reveal-v147/);
+  assert.match(indexSource, /style\.css\?v=review-schedule-gate-v151/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
-  assert.match(serviceWorkerSource, /study-dashboard-schedule-transition-v149/);
-  assert.match(serviceWorkerSource, /style\.css\?v=next-task-reveal-v147/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /study-dashboard-review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /style\.css\?v=review-schedule-gate-v151/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
   assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
   assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
@@ -535,6 +538,21 @@ test("one daily review workload drives cockpit progress and the scheduled execut
   assert.match(progressRunnerSource, /model\.reviewMode === "daily-budget"/);
 });
 
+test("review starts obey the scheduled block and the nightly stop without changing review facts", () => {
+  assert.match(p0ResultsSource, /function getReviewScheduleGate\(task, options = \{\}\)/);
+  assert.match(p0ResultsSource, /state: "waiting"[\s\S]*复盘入口将在 \$\{startLabel\} 开放/);
+  assert.match(p0ResultsSource, /state: "closed"[\s\S]*已到晚间止损时间/);
+  assert.match(p0ResultsSource, /state: nowMinutes < endMinutes \? "active" : "catch-up"/);
+  assert.match(p0ResultsSource, /start\.disabled = !reviewGate\.allowed/);
+  assert.match(p0ResultsSource, /freeFocus\.disabled = !reviewGate\.allowed/);
+  assert.match(p0ResultsSource, /function handleDueReviewClick[\s\S]*getCurrentReviewScheduleGate\(plan\)[\s\S]*if \(!reviewGate\.allowed\)/);
+  assert.match(tasksSource, /function startReviewFocusRound\(review, options = \{\}\)[\s\S]*getCurrentReviewScheduleGate\(plan\)[\s\S]*if \(!reviewGate\.allowed\)/);
+  assert.match(styleSource, /\.review-schedule-gate\.is-waiting/);
+  assert.match(styleSource, /\.button:disabled/);
+  const gateBlock = p0ResultsSource.slice(p0ResultsSource.indexOf("function getReviewScheduleGate"), p0ResultsSource.indexOf("function validateRollingReviewCompletion"));
+  assert.doesNotMatch(gateBlock, /writeJson|localStorage\.setItem|saveTodayPlan|setTaskStatus/);
+});
+
 test("rolling review requires closed-book evidence before a result can be saved", () => {
   assert.match(p0ResultsSource, /记住了=\$\{normalized\.remembered/);
   assert.match(p0ResultsSource, /请先填写“记住了”/);
@@ -578,10 +596,10 @@ test("review focus closes directly into evidence result and the next review hand
   assert.doesNotMatch(deferBlock, /saveDueReviewResult|applyReviewResult|writeJson/);
   assert.match(executionStateSource, /const contextMismatch = Boolean\(contextId && primaryContextId && contextId !== primaryContextId\)/);
   assert.match(executionStateSource, /\["mode", "kind", "action", "taskId", "contextId", "taskAction"\]/);
-  assert.match(indexSource, /style\.css\?v=next-task-reveal-v147/);
-  assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
-  assert.match(serviceWorkerSource, /style\.css\?v=next-task-reveal-v147/);
-  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
+  assert.match(indexSource, /style\.css\?v=review-schedule-gate-v151/);
+  assert.match(indexSource, /js\/p0-results\.js\?v=review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /style\.css\?v=review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-schedule-gate-v151/);
 });
 
 test("review focus identity and unresolved evidence survive a safe page recovery", () => {
@@ -602,8 +620,8 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.match(tasksSource, /function returnFromFocusReview\(\)[\s\S]*复盘结果未保存[\s\S]*pendingFocusReview = null/);
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
-  assert.match(serviceWorkerSource, /study-dashboard-schedule-transition-v149/);
+  assert.match(indexSource, /js\/tasks\.js\?v=review-schedule-gate-v151/);
+  assert.match(serviceWorkerSource, /study-dashboard-review-schedule-gate-v151/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {
