@@ -1,10 +1,10 @@
-// v7.3 shared storage helpers. Existing learning records are preserved.
-const APP_VERSION = "7.3.0";
+// v8.4 shared storage helpers. Existing learning records are preserved.
+const APP_VERSION = "8.4.0";
 const historyKey = "review-history";
 const lastBackupKey = "lastBackupAt";
 const lastFullBackupKey = "lastFullBackupAt";
 const appDataSchemaVersionKey = "appDataSchemaVersion";
-const currentAppDataSchemaVersion = "7.3";
+const currentAppDataSchemaVersion = "8.4";
 const dailyPlansKey = "studyDailyPlans";
 const planPhaseTemplatesKey = "studyPlanPhaseTemplates";
 const planWindowStateKey = "studyPlanWindowState";
@@ -18,15 +18,25 @@ const focusThoughtsKey = "studyFocusThoughts";
 const manualTimeRecordsKey = "studyManualTimeRecords";
 const dailyStudyTargetsKey = "studyDailyTargetSeconds";
 const examStatsConfigKey = "studyExamStatsConfig";
+const admissionMockScoresKey = "studyAdmissionMockScores";
+const admissionAssessmentConfigKey = "studyAdmissionAssessmentConfig";
 const importedPlanKey = "studyImportedPlan";
 const reviewQueueKey = "reviewQueue";
 const professionalResultsKey = "studyProfessionalResults";
+const englishWordRecordsKey = "studyEnglishWordRecords";
+const englishReadingRecordsKey = "studyEnglishReadingRecords";
+const politicsRecordsKey = "studyPoliticsRecords";
+const outputRecordsKey = "studyOutputRecords";
+const ankiCandidatesKey = "studyAnkiCandidates";
+const executionModesKey = "studyExecutionModes";
+const debtQueueKey = "studyDebtQueue";
 const legacyBackupKey = "legacyBackup";
 const migrationStateKey = "studyMigrationState";
 const migrationReportsKey = "studyMigrationReports";
 const migrationRollbackKey = "studyMigrationRollback";
 const errorLogKey = "studyErrorLog";
 const uiPreferencesKey = "studyUiPreferences";
+const weeklyImprovementRecordsKey = "studyWeeklyImprovementRecords";
 const autoSaveFields = Array.from(document.querySelectorAll("[data-save]"));
 
 function getDateKey(date = new Date()) {
@@ -49,8 +59,13 @@ function readJson(key, fallback) {
   }
 }
 
-function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+function writeJson(key, value, options = {}) {
+  const beforeValue = localStorage.getItem(key);
+  const afterValue = JSON.stringify(value);
+  localStorage.setItem(key, afterValue);
+  if (options.skipSyncCapture !== true && typeof captureOfflineSyncWrite === "function") {
+    captureOfflineSyncWrite(key, beforeValue, afterValue);
+  }
 }
 
 function ensureDataSchema() {
@@ -67,8 +82,17 @@ function ensureDataSchema() {
   if (localStorage.getItem(manualTimeRecordsKey) === null) writeJson(manualTimeRecordsKey, []);
   if (localStorage.getItem(dailyStudyTargetsKey) === null) writeJson(dailyStudyTargetsKey, {});
   if (localStorage.getItem(examStatsConfigKey) === null) writeJson(examStatsConfigKey, { startDate: "2026-07-18" });
+  if (localStorage.getItem(admissionMockScoresKey) === null) writeJson(admissionMockScoresKey, []);
+  if (localStorage.getItem(admissionAssessmentConfigKey) === null) writeJson(admissionAssessmentConfigKey, {});
   if (localStorage.getItem(reviewQueueKey) === null) writeJson(reviewQueueKey, []);
   if (localStorage.getItem(professionalResultsKey) === null) writeJson(professionalResultsKey, { schemaVersion: 1, days: {} });
+  if (localStorage.getItem(englishWordRecordsKey) === null) writeJson(englishWordRecordsKey, []);
+  if (localStorage.getItem(englishReadingRecordsKey) === null) writeJson(englishReadingRecordsKey, []);
+  if (localStorage.getItem(politicsRecordsKey) === null) writeJson(politicsRecordsKey, []);
+  if (localStorage.getItem(outputRecordsKey) === null) writeJson(outputRecordsKey, []);
+  if (localStorage.getItem(ankiCandidatesKey) === null) writeJson(ankiCandidatesKey, []);
+  if (localStorage.getItem(executionModesKey) === null) writeJson(executionModesKey, { schemaVersion: 1, days: {} });
+  if (localStorage.getItem(debtQueueKey) === null) writeJson(debtQueueKey, []);
   if (localStorage.getItem(errorLogKey) === null) writeJson(errorLogKey, []);
   if (localStorage.getItem(uiPreferencesKey) === null) writeJson(uiPreferencesKey, {
     hideLowFrequencyModules: true,
@@ -82,7 +106,7 @@ function ensureDataSchema() {
   }
   if (!hadStoredData && localStorage.getItem(migrationStateKey) === null) {
     writeJson(migrationStateKey, {
-      migrationId: P0_FINAL_MIGRATION_ID,
+      migrationId: typeof P1_FINAL_MIGRATION_ID === "string" ? P1_FINAL_MIGRATION_ID : "p1-final-integration-v1",
       status: "completed",
       source: "fresh-install",
       targetVersion: currentAppDataSchemaVersion,

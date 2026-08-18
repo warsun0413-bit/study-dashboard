@@ -12,7 +12,7 @@ const hash = (buffer) => createHash("sha256").update(buffer).digest("hex").toUpp
 function createContext() {
   const context = vm.createContext({
     console, Date,
-    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "7.3", APP_VERSION: "7.3.0",
+    appDataSchemaVersionKey: "appDataSchemaVersion", currentAppDataSchemaVersion: "8.4", APP_VERSION: "8.4.0",
     historyKey: "review-history", dailyPlansKey: "studyDailyPlans", planPhaseTemplatesKey: "studyPlanPhaseTemplates",
     planWindowStateKey: "studyPlanWindowState", planMigrationBackupsKey: "studyPlanMigrationBackups",
     focusMinutesKey: "studyFocusSeconds", taskFocusSecondsKey: "studyTaskFocusSeconds", focusSessionsKey: "studyFocusSessions",
@@ -52,11 +52,15 @@ test("real backup completes the P0 final migration, snapshot, restore, and norma
   const legacy = JSON.parse(values.legacyBackup);
   const templates = JSON.parse(values.studyPlanPhaseTemplates);
 
-  assert.equal(values.appDataSchemaVersion, "7.3");
+  assert.equal(values.appDataSchemaVersion, "8.4");
   assert.equal(Object.keys(plans).length, 10);
   assert.equal(Object.keys(plans).filter((date) => date >= "2026-07-18").length, 7);
   assert.equal(templates.length, 10);
-  assert.deepEqual(plans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
+  const migratedTodayTasks = plans["2026-07-18"].tasks;
+  const addedWords = migratedTodayTasks.find((task) => task.id === "plan-english-words");
+  assert.equal(addedWords.time, "08:00—08:25");
+  assert.equal(addedWords.status, "not-started");
+  assert.deepEqual(migratedTodayTasks.filter((task) => task.id !== "plan-english-words").map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
   assert.equal(values.studyFocusSessions, originalSessionsRaw);
   assert.equal(JSON.parse(values.studyFocusSessions).length, 12);
   assert.equal(originalSessions.filter((session) => Number(session && session.seconds) <= 0).length, 1);

@@ -40,7 +40,7 @@ test("real backup focus data can be inspected without modifying the fixture", ()
     ? JSON.parse(storage.studyFocusTimerState)
     : storage.studyFocusTimerState;
   const normalized = context.normalize(rawState, { date: rawState.date, now: new Date(`${rawState.date}T12:00:00`).getTime() });
-  assert.equal(normalized.timerVersion, 3);
+  assert.equal(normalized.timerVersion, 4);
   assert.equal(normalized.running, false);
   assert.ok(Number.isFinite(normalized.currentFocusSeconds));
   assert.equal(Object.values(focusTotals).reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0), originalFocusTotal);

@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#315c4c">
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="学习面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="study-dashboard-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=magic-link-v158">
 </head>
 <body>
   <header class="site-header">
@@ -16,66 +20,100 @@
       <h1>南开马理论考研任务面板</h1>
       <p id="todayDate" class="muted"></p>
     </div>
+    <aside class="offline-sync-card" aria-labelledby="offlineSyncStatus">
+      <strong id="offlineSyncStatus">正在检查离线记录</strong>
+      <small id="offlineSyncDetail">本阶段只建立本机待上传队列，不上传真实数据。</small>
+      <small>只接受 Supabase Publishable key；不会接收 Secret 或 service_role 密钥。</small>
+      <div class="offline-sync-actions">
+        <button id="protectOfflineStorageBtn" class="button secondary" type="button">保护本机记录</button>
+        <button id="installOfflineDashboardBtn" class="button ghost" type="button">安装到 iPad</button>
+        <button id="uploadOfflineSyncBtn" class="button ghost" type="button">连接云端</button>
+      </div>
+      <details id="cloudSyncSetup" class="cloud-sync-setup">
+        <summary>云端同步设置</summary>
+        <div class="cloud-sync-fields">
+          <label>Supabase 项目地址
+            <input id="cloudSyncProjectUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://项目代号.supabase.co">
+          </label>
+          <label>Publishable key
+            <input id="cloudSyncPublishableKey" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_...">
+          </label>
+          <label>登录邮箱
+            <input id="cloudSyncEmail" type="email" inputmode="email" autocomplete="email" placeholder="你的邮箱">
+          </label>
+          <p>使用 Supabase 默认 Magic Link：邮件链接返回本页后会自动登录。部署后需把本页 HTTPS 地址加入 Supabase 的 Redirect URLs。</p>
+          <div class="cloud-sync-buttons">
+            <button id="saveCloudSyncConfigBtn" class="button ghost" type="button">保存设备配置</button>
+            <button id="sendCloudSyncMagicLinkBtn" class="button secondary" type="button">发送登录链接</button>
+          </div>
+          <div class="cloud-sync-buttons">
+            <button id="initializeCloudDeviceBtn" class="button secondary" type="button" hidden>从云端初始化本设备</button>
+            <button id="signOutCloudSyncBtn" class="button ghost" type="button" hidden>退出云端登录</button>
+          </div>
+        </div>
+      </details>
+      <span id="offlineSyncActionStatus" class="status" aria-live="polite"></span>
+    </aside>
   </header>
 
   <main class="dashboard">
-    <section class="panel home-order-1" aria-labelledby="phaseOverviewTitle">
-      <p class="step">当前阶段</p><h2 id="phaseOverviewTitle"><span id="currentPhaseName">未配置</span></h2>
-      <div class="phase-overview-grid">
-        <div><span>阶段日期</span><strong id="currentPhaseDates">未配置</strong><small id="currentPhaseRemaining">不显示虚构倒计时</small></div>
-        <div><span>下一阶段</span><strong id="nextPhaseName">未配置</strong></div>
-        <div><span>下一关键里程碑</span><strong id="nextMilestone">未配置</strong></div>
-      </div>
-    </section>
-
-    <section class="panel home-order-2" aria-labelledby="topPriorityTitle">
-      <p class="step">今日最高优先级</p><h2 id="topPriorityTitle">先处理这三项</h2>
-      <div id="topPriorityList" class="priority-list"></div>
-    </section>
-
-    <details class="panel exam-stats-panel home-order-10 low-frequency-panel">
-      <summary><span><span class="step">低频统计</span><strong id="examStatsTitle">考研累计学习概览</strong></span></summary>
+    <details class="panel phase-overview-panel home-order-5 low-frequency-panel" aria-labelledby="phaseOverviewTitle">
+      <summary><span><span class="step">阶段信息</span><strong id="phaseOverviewTitle"><span id="currentPhaseName">未配置</span></strong></span></summary>
       <div class="low-frequency-body">
-      <div class="section-heading">
-        <div><h2>从计划开始到今天</h2></div>
-        <div class="exam-stats-total"><span>累计学习总时长</span><strong id="examStatsTotal">0分钟</strong></div>
-      </div>
-      <p id="examStatsRange" class="muted exam-stats-range">统计区间：2026-07-18 至今天</p>
-      <div id="examSubjectBars" class="exam-subject-bars" aria-label="各科目累计学习时长占比"></div>
+        <div class="phase-overview-grid">
+          <div><span>阶段日期</span><strong id="currentPhaseDates">未配置</strong><small id="currentPhaseRemaining">不显示虚构倒计时</small></div>
+          <div><span>下一阶段</span><strong id="nextPhaseName">未配置</strong></div>
+          <div><span>下一关键里程碑</span><strong id="nextMilestone">未配置</strong></div>
+        </div>
       </div>
     </details>
 
-    <section class="panel home-order-4" aria-labelledby="planTitle">
-      <div class="section-heading">
-        <div><p class="step">01 今日计划</p><h2 id="planTitle">今日时间表</h2><p id="scheduleHint" class="muted schedule-hint"></p></div>
-        <div class="rate"><strong id="completionRate">0%</strong><span id="completionText">已完成 0 / 8 项</span></div>
-      </div>
-      <div class="progress" aria-label="今日任务完成率"><span id="completionBar"></span></div>
-
-      <h3>今日任务完成状态</h3>
-      <div id="taskList" class="task-list"></div>
+    <details id="todayPlanPanel" class="panel home-order-2 today-plan-panel" aria-labelledby="planTitle">
+      <summary class="today-plan-summary">
+        <span><span class="step">02 今日计划</span><strong id="planTitle">今日时间表</strong></span>
+        <span id="todayPlanSummary" class="today-plan-summary-status">正在汇总今日计划</span>
+      </summary>
+      <div class="today-plan-body">
+        <p id="scheduleHint" class="muted schedule-hint"></p>
+        <div id="taskList" class="task-list"></div>
       <details id="professionalResultsPanel" class="professional-results-panel">
         <summary>722 / 844 知识单元结果</summary>
-        <p class="muted">专业课任务不能只勾选完成；请记录实际知识点、掌握度、验收结果、主要遗漏和下一准确起点。</p>
-        <input id="professionalUnitId" type="hidden">
-        <div class="professional-result-form">
-          <label>科目<select id="professionalSubject"><option value="722">722 马原</option><option value="844">844 马发史</option></select></label>
-          <label>知识单元<input id="professionalUnitName" maxlength="160" placeholder="例如：实践与认识的辩证关系"></label>
-          <label>掌握度<select id="professionalMastery"><option>L0</option><option>L1</option><option>L2</option><option>L3</option><option>L4</option><option>L5</option></select></label>
-          <label>复盘结果<select id="professionalReviewResult"><option value="unverified">未验收</option><option value="passed">通过</option><option value="partial">部分通过</option><option value="failed">未通过</option></select></label>
-          <label class="wide-field">闭卷复述结果<textarea id="professionalClosedBook" rows="2" maxlength="500" placeholder="L3—L5 必须填写真实闭卷验收结果"></textarea></label>
-          <label class="wide-field">书面重构<textarea id="professionalReconstruction" rows="2" maxlength="500"></textarea></label>
-          <label class="wide-field">原著调用<textarea id="professionalOriginalText" rows="2" maxlength="500"></textarea></label>
-          <label>主要遗漏<textarea id="professionalGaps" rows="3" maxlength="500" placeholder="一行一个；如果没有请明确填写“无”"></textarea></label>
-          <label>必须记忆<textarea id="professionalMustMemorize" rows="3" maxlength="500" placeholder="一行一个，可暂留空"></textarea></label>
-          <label class="wide-field">下一准确起点<input id="professionalNextStart" maxlength="240" placeholder="下一次从哪个具体问题或页段开始"></label>
+        <p class="muted">只填实际推进、闭卷产物、下一起点；闭卷产物留空时只保存为进行中。</p>
+        <div class="professional-quick-record">
+          <label for="professionalQuickRecord">三项记录</label>
+          <textarea id="professionalQuickRecord" rows="9" spellcheck="false" placeholder="从722或844任务点击“记录实际结果”，模板会自动填入"></textarea>
+          <div class="button-row">
+            <button id="copyProfessionalTemplateBtn" class="button secondary" type="button">生成双科模板</button>
+            <button id="saveProfessionalQuickBtn" class="button primary" type="button">保存并更新任务</button>
+            <span id="professionalQuickStatus" class="status" aria-live="polite"></span>
+          </div>
         </div>
-        <div class="button-row"><button id="saveProfessionalResultBtn" class="button primary" type="button">保存知识单元结果</button><button id="clearProfessionalResultBtn" class="button ghost" type="button">清空表单</button><span id="professionalResultStatus" class="status" aria-live="polite"></span></div>
-        <div id="professionalResultsList" class="professional-results-list"></div>
-      </details>
-    </section>
+        <details class="professional-advanced-editor" hidden>
+          <summary>高级编辑：逐项修改</summary>
+          <input id="professionalUnitId" type="hidden">
+          <div class="professional-result-form">
+            <label>科目<select id="professionalSubject"><option value="722">722 马原</option><option value="844">844 马发史</option></select></label>
+            <label>知识单元<input id="professionalUnitName" maxlength="160" placeholder="例如：实践与认识的辩证关系"></label>
+            <label>掌握度<select id="professionalMastery"><option>L0</option><option>L1</option><option>L2</option><option>L3</option><option>L4</option><option>L5</option></select></label>
+            <label>复盘结果<select id="professionalReviewResult"><option value="unverified">未验收</option><option value="passed">通过</option><option value="partial">部分通过</option><option value="failed">未通过</option></select></label>
+            <label class="wide-field">闭卷复述结果<textarea id="professionalClosedBook" rows="2" maxlength="500" placeholder="L3—L5 必须填写真实闭卷验收结果"></textarea></label>
+            <label class="wide-field">书面重构<textarea id="professionalReconstruction" rows="2" maxlength="500"></textarea></label>
+            <label class="wide-field">原著调用<textarea id="professionalOriginalText" rows="2" maxlength="500"></textarea></label>
+            <label>主要遗漏<textarea id="professionalGaps" rows="3" maxlength="500" placeholder="一行一个；如果没有请明确填写“无”"></textarea></label>
+            <label>必须记忆<textarea id="professionalMustMemorize" rows="3" maxlength="500" placeholder="一行一个，可暂留空"></textarea></label>
+            <label class="wide-field">下一准确起点<input id="professionalNextStart" maxlength="240" placeholder="下一次从哪个具体问题或页段开始"></label>
+          </div>
+          <div class="button-row"><button id="saveProfessionalResultBtn" class="button primary" type="button">保存知识单元结果</button><button id="clearProfessionalResultBtn" class="button ghost" type="button">清空表单</button><span id="professionalResultStatus" class="status" aria-live="polite"></span></div>
+        </details>
+        <details class="professional-saved-details">
+          <summary>查看今日已保存详细记录</summary>
+          <div id="professionalResultsList" class="professional-results-list"></div>
+        </details>
+        </details>
+      </div>
+    </details>
 
-    <section class="panel home-order-5" aria-labelledby="dueReviewsTitle">
+    <section id="dueReviewsPanel" class="panel home-order-3" aria-labelledby="dueReviewsTitle">
       <div class="section-heading">
         <div><p class="step">今日复盘</p><h2 id="dueReviewsTitle">今日到期复盘</h2></div>
         <strong id="dueReviewsCount" class="due-reviews-count">0 项</strong>
@@ -84,110 +122,395 @@
       <p id="dueReviewsStatus" class="status" aria-live="polite"></p>
     </section>
 
-    <section id="execution" class="panel home-order-3" aria-labelledby="executionTitle">
-      <div class="section-heading">
-        <div><p class="step">02 当前执行</p><h2 id="executionTitle">一次只推进一个任务</h2></div>
-        <button id="enterFocusModeBtn" class="button secondary" type="button">进入专注模式</button>
-      </div>
-      <div class="field-grid execution-fields">
-        <label>时间块<input id="currentTaskTime" readonly placeholder="尚未选择"></label>
-        <label>当前任务<select id="focusTask"><option value="">请选择今日任务</option></select></label>
-        <label class="execution-description">今日任务说明<textarea id="focusOutput" rows="3" readonly placeholder="点击时间表中的“设为当前任务”"></textarea></label>
-        <label class="execution-description focus-round-goal-field">本轮目标<input id="focusRoundGoalInput" maxlength="120" placeholder="例如：完成实践与认识部分闭卷复述"></label>
-      </div>
-      <div class="focus-mode-selector" aria-label="专注计时模式">
-        <span>专注模式</span>
-        <div class="button-row">
-          <button id="freeFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
-          <button id="pomodoroFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="false">25分钟番茄</button>
+    <section id="execution" class="panel home-order-1" aria-labelledby="executionTitle">
+      <p class="step">01 现在做什么</p>
+      <div class="cockpit-current">
+        <div>
+          <p id="cockpitTaskMeta" class="cockpit-task-meta">正在选择今日任务</p>
+          <h2 id="executionTitle">现在开始一项正式任务</h2>
+          <p id="cockpitTaskDescription" class="muted">网站会按照当前任务和时间块给出一个明确入口。</p>
+          <div id="cockpitExecutionBrief" class="execution-brief" hidden></div>
+        </div>
+        <div class="cockpit-focus-actions">
+          <button id="enterFocusModeBtn" class="button primary cockpit-primary-action" type="button">先做5分钟</button>
+          <button id="startFreeFocusBtn" class="button secondary cockpit-free-focus-action" type="button" hidden>直接自由专注</button>
         </div>
       </div>
-      <div class="focus-totals" aria-live="polite">
-        <div><span>本次专注</span><strong id="currentFocusTime">00:00:00</strong></div>
-        <div><span>今日累计专注</span><strong id="todayFocusTotal">00:00:00</strong></div>
-        <div><span>手动补录学习</span><strong id="todayManualStudyTotal">00:00:00</strong></div>
-        <div class="study-total-highlight"><span>今日总学习时长</span><strong id="todayStudyTotal">00:00:00</strong></div>
+      <div id="resultHandoffReceipt" class="result-handoff-receipt" hidden>
+        <div>
+          <strong id="resultHandoffTitle">结果已保存</strong>
+          <span id="resultHandoffNext"></span>
+          <div id="resultHandoffBrief" class="execution-brief is-compact" hidden></div>
+        </div>
+        <div class="result-handoff-actions">
+          <button id="startResultHandoffNextBtn" class="button primary" type="button">先做下一项5分钟</button>
+          <button id="startResultHandoffFreeBtn" class="button secondary" type="button" hidden>下一项自由专注</button>
+          <button id="dismissResultHandoffBtn" class="button ghost" type="button">稍后再做</button>
+        </div>
       </div>
-      <div class="study-target-summary" aria-live="polite">
-        <span>今日目标 <strong id="todayStudyTarget">9小时00分钟</strong></span>
-        <span>完成进度 <strong id="todayStudyProgress">0%</strong></span>
-        <span id="todayStudyRemaining">还差：9小时00分钟</span>
+      <div id="safeguardModeBanner" class="safeguard-mode-banner" hidden>
+        <div>
+          <strong id="safeguardModeProgress">保底闭环</strong>
+          <span id="safeguardModeHint">这不是降低目标，只用于防止今天归零。</span>
+        </div>
+        <button id="toggleSafeguardModeBtn" class="button ghost" type="button">退出保底，返回正常计划</button>
       </div>
-      <details class="manual-time-entry">
-        <summary>补录学习时间</summary>
-        <div class="manual-time-form">
-          <label>小时<input id="manualStudyHours" type="number" min="0" max="24" step="1" value="0"></label>
-          <label>分钟<input id="manualStudyMinutes" type="number" min="0" max="59" step="1" value="0"></label>
-          <label>对应任务（可选）<select id="manualStudyTask"></select></label>
-          <label class="manual-time-note">简短备注（可选）<input id="manualStudyNote" maxlength="120" placeholder="例如：纸质真题复盘，未开启计时器"></label>
-          <div class="button-row manual-time-actions"><button id="saveManualStudyTimeBtn" class="button secondary" type="button">保存补录</button><span id="manualStudyStatus" class="status" aria-live="polite"></span></div>
+      <div id="dailyHandoffBanner" class="daily-handoff-banner" hidden>
+        <div>
+          <strong>接着昨天开始</strong>
+          <span id="dailyHandoffSource"></span>
         </div>
-        <div id="manualStudyRecords" class="manual-time-records"></div>
-      </details>
-      <details class="daily-target-editor">
-        <summary>临时修改今日目标</summary>
-        <div class="daily-target-form">
-          <label>小时<input id="dailyTargetHours" type="number" min="0" max="24" step="1"></label>
-          <label>分钟<input id="dailyTargetMinutes" type="number" min="0" max="59" step="1"></label>
-          <div class="button-row"><button id="saveDailyTargetBtn" class="button ghost" type="button">保存今日目标</button><span id="dailyTargetStatus" class="status" aria-live="polite"></span></div>
+        <button id="dismissDailyHandoffBtn" class="button ghost" type="button">先看正常计划</button>
+      </div>
+      <button id="enterSafeguardModeBtn" class="button ghost safeguard-entry-button" type="button">状态很差？进入今日保底执行</button>
+      <div class="cockpit-metrics" aria-live="polite">
+        <div class="cockpit-metric study-total-highlight">
+          <span>今日有效学习</span>
+          <strong id="todayStudyTotal">00:00:00</strong>
+          <small>执行目标 <span id="todayStudyTarget">计算中</span> · 原计划上限 <span id="todayPlanStudyTarget">计算中</span> · 依据 <span id="todayStudyTargetSource">正在读取记录</span> · <span id="todayStudyProgress">0%</span> · <span id="todayStudyRemaining">正在计算</span></small>
         </div>
-      </details>
-      <div class="pomodoro" aria-label="专注计时控制">
-        <div class="button-row">
-          <button id="startPomodoroBtn" class="button primary" type="button">开始</button>
-          <button id="pausePomodoroBtn" class="button ghost" type="button">暂停</button>
-          <button id="resetPomodoroBtn" class="button ghost" type="button">结束本次专注</button>
-          <button id="completeCurrentTaskBtn" class="button success" type="button">完成当前任务</button>
+        <div class="cockpit-metric">
+          <span>正式任务完成</span>
+          <strong id="completionRate">0%</strong>
+          <small id="completionText">已完成 0 / 8 项学习任务</small>
+          <div class="progress" aria-label="今日任务完成率"><span id="completionBar"></span></div>
         </div>
+        <a class="cockpit-metric cockpit-review-link" href="#dueReviewsTitle">
+          <span>今日复盘待做</span>
+          <strong id="cockpitDueReviewsCount">0</strong>
+          <small id="cockpitDueReviewsMeta">正在读取今日预算</small>
+        </a>
+      </div>
+      <section class="today-study-timeline-card" aria-labelledby="todayStudyTimelineTitle">
+        <div class="today-study-timeline-heading">
+          <div><span class="step">今日学习时间段</span><h3 id="todayStudyTimelineTitle">学习时间记录</h3></div>
+          <strong id="todayStudyTimelineSummary">0 段 · 暂无记录</strong>
+        </div>
+        <div class="manual-time-entry">
+          <strong>补录未计时的学习</strong>
+          <div class="manual-time-form">
+            <label>开始时间<input id="manualStudyStartTime" type="time"></label>
+            <label>结束时间<input id="manualStudyEndTime" type="time"></label>
+            <label>对应任务（可选）<select id="manualStudyTask"></select></label>
+            <label class="manual-time-note">简短备注（可选）<input id="manualStudyNote" maxlength="120" placeholder="例如：纸质真题复盘，未开启计时器"></label>
+            <details class="manual-duration-fallback">
+              <summary>只知道学习时长？</summary>
+              <div>
+                <label>小时<input id="manualStudyHours" type="number" min="0" max="24" step="1" value="0"></label>
+                <label>分钟<input id="manualStudyMinutes" type="number" min="0" max="59" step="1" value="0"></label>
+              </div>
+            </details>
+            <div class="button-row manual-time-actions"><button id="saveManualStudyTimeBtn" class="button secondary" type="button">保存补录</button><span id="manualStudyStatus" class="status" aria-live="polite"></span></div>
+          </div>
+        </div>
+        <div id="manualStudyRecords" class="today-study-timeline-list" aria-live="polite"></div>
+      </section>
+      <div class="cockpit-next">
+        <span>下一项学习任务</span>
+        <div id="topPriorityList" class="priority-list"></div>
       </div>
       <p id="executionStatus" class="status" aria-live="polite"></p>
+      <details class="execution-settings low-frequency-panel">
+        <summary>执行设置与补录</summary>
+        <div class="low-frequency-body">
+          <div class="field-grid execution-fields">
+            <label>时间块<input id="currentTaskTime" readonly placeholder="尚未选择"></label>
+            <label>当前任务<select id="focusTask"><option value="">请选择今日任务</option></select></label>
+            <label class="execution-description">今日任务说明<textarea id="focusOutput" rows="3" readonly placeholder="点击时间表中的“设为当前任务”"></textarea></label>
+            <label class="execution-description focus-round-goal-field">本轮目标<input id="focusRoundGoalInput" maxlength="120" placeholder="例如：完成实践与认识部分闭卷复述"></label>
+          </div>
+          <div class="focus-mode-selector" aria-label="专注计时模式">
+            <span>专注模式</span>
+            <div class="button-row">
+              <button id="freeFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
+              <button id="pomodoroFocusModeBtn" class="button focus-mode-button" type="button" aria-pressed="false">25分钟番茄</button>
+            </div>
+          </div>
+          <div class="focus-totals" aria-live="polite">
+            <div><span>本次专注</span><strong id="currentFocusTime">00:00:00</strong></div>
+            <div><span>今日累计专注</span><strong id="todayFocusTotal">00:00:00</strong></div>
+            <div><span>手动补录学习</span><strong id="todayManualStudyTotal">00:00:00</strong></div>
+          </div>
+          <details class="daily-target-editor">
+            <summary>临时修改今日目标</summary>
+            <div class="daily-target-form">
+              <label>小时<input id="dailyTargetHours" type="number" min="0" max="24" step="1"></label>
+              <label>分钟<input id="dailyTargetMinutes" type="number" min="0" max="59" step="1"></label>
+              <div class="button-row"><button id="saveDailyTargetBtn" class="button ghost" type="button">保存今日目标</button><span id="dailyTargetStatus" class="status" aria-live="polite"></span></div>
+            </div>
+          </details>
+          <div class="pomodoro" aria-label="专注计时控制">
+            <div class="button-row">
+              <button id="startPomodoroBtn" class="button primary" type="button">开始</button>
+              <button id="pausePomodoroBtn" class="button ghost" type="button">暂停</button>
+              <button id="resetPomodoroBtn" class="button ghost" type="button">结束本次专注</button>
+              <button id="completeCurrentTaskBtn" class="button success" type="button">完成当前任务</button>
+            </div>
+          </div>
+        </div>
+      </details>
     </section>
 
-    <section class="panel home-order-6" aria-labelledby="factSummaryTitle">
-      <p class="step">今日事实摘要</p><h2 id="factSummaryTitle">到期、逾期与未完成</h2>
-      <div class="fact-summary-grid">
-        <a href="#dueReviewsTitle"><span>今日到期复盘</span><strong id="summaryDueToday">0</strong></a>
-        <a href="#dueReviewsTitle"><span>逾期复盘</span><strong id="summaryOverdueReviews">0</strong></a>
-        <a href="#planTitle"><span>未完成学习任务</span><strong id="summaryUnfinishedTasks">0</strong></a>
+    <section id="studyProgressRunner" class="panel home-order-4 progress-runner-panel" aria-labelledby="progressRunnerTitle">
+      <div class="progress-runner-heading">
+        <div>
+          <p class="step">学习进度跑道</p>
+          <h2 id="progressRunnerTitle">我现在跑到哪里了</h2>
+        </div>
+        <strong id="progressRunnerStatus" class="progress-runner-status">数据积累中</strong>
       </div>
-      <p><strong>当前进行中：</strong><span id="summaryInProgress">无</span></p>
-      <p><strong>超过计划时间仍未完成：</strong><span id="summaryScheduleOverdue">无</span></p>
+      <div class="progress-runner-tabs" aria-label="学习进度周期">
+        <button class="button ghost" type="button" data-progress-period="daily" aria-pressed="true">每天</button>
+        <button class="button ghost" type="button" data-progress-period="weekly" aria-pressed="false">每周</button>
+        <button class="button ghost" type="button" data-progress-period="monthly" aria-pressed="false">每月</button>
+        <span id="progressRunnerRange" class="muted"></span>
+      </div>
+      <div id="progressRunnerPhase" class="progress-runner-phase">
+        <div class="progress-runner-phase-heading">
+          <strong>本阶段应完成的章节任务</strong>
+          <div>
+            <small id="progressRunnerPhaseMeta">正在读取阶段计划。</small>
+            <button id="editProgressRunnerPhaseChaptersBtn" class="button ghost" type="button">设置章节范围</button>
+          </div>
+        </div>
+        <div id="progressRunnerPhaseTasks" class="progress-runner-phase-tasks" aria-live="polite"></div>
+        <form id="progressRunnerPhaseEditor" class="progress-runner-phase-editor" hidden>
+          <p class="muted">只填写已经确认的章节或知识块，不会自动推测，也不会修改每日完成记录。</p>
+          <div class="progress-runner-phase-editor-fields">
+            <label>722 本阶段章节<textarea id="progressRunnerChapter722" rows="2" maxlength="240" placeholder="例如：第二章 真理与价值"></textarea></label>
+            <label>844 本阶段章节<textarea id="progressRunnerChapter844" rows="2" maxlength="240" placeholder="例如：第三章 青年马克思"></textarea></label>
+            <label>政治本阶段章节<textarea id="progressRunnerChapterPolitics" rows="2" maxlength="240" placeholder="例如：第一章 马克思主义基本立场"></textarea></label>
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="submit">保存章节范围</button>
+            <button id="cancelProgressRunnerPhaseChaptersBtn" class="button ghost" type="button">取消</button>
+            <span id="progressRunnerPhaseEditorStatus" class="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+      <div class="progress-runner-track-wrap">
+        <div class="progress-runner-track" role="img" aria-label="实际学习进度与当前计划位置对比">
+          <span class="progress-runner-start">起点</span>
+          <span id="progressRunnerPerson" class="progress-runner-person" aria-hidden="true">🏃</span>
+          <span id="progressRunnerExpected" class="progress-runner-expected"><span>应到</span>🚩</span>
+          <span class="progress-runner-finish" aria-hidden="true">🏁</span>
+        </div>
+      </div>
+      <div class="progress-runner-summary" aria-live="polite">
+        <div><span>实际进度</span><strong id="progressRunnerActual">0%</strong></div>
+        <div><span>当前应到</span><strong id="progressRunnerExpectedValue">0%</strong></div>
+        <div><span>进度差</span><strong id="progressRunnerGap">0%</strong></div>
+      </div>
+      <p id="progressRunnerReason" class="progress-runner-reason">正在根据现有学习记录计算。</p>
+      <div class="progress-runner-breakdown">
+        <div><span>正式任务（等效完成）</span><strong id="progressRunnerTasks">暂无计划</strong></div>
+        <div><span>有效学习</span><strong id="progressRunnerTime">0分钟</strong></div>
+        <div><span>到期复盘</span><strong id="progressRunnerReviews">本期无到期</strong></div>
+        <div><span>正式结果</span><strong id="progressRunnerEvidence">0 条</strong></div>
+      </div>
+      <p id="progressRunnerBaseline" class="muted progress-runner-baseline">尚无个人基线</p>
     </section>
 
-    <section class="panel home-order-7" aria-labelledby="reviewTitle">
-      <p class="step">03 今日学习记录</p><h2 id="reviewTitle">用五个问题完成今天的闭环</h2>
-      <div class="field-grid two-columns">
-        <label>今天完成了什么<textarea id="reviewCompletedToday" data-review-field="completed-today" rows="4"></textarea></label>
-        <label>今天没完成什么<textarea id="reviewUnfinishedToday" data-review-field="unfinished-today" rows="4"></textarea></label>
-        <label>为什么没完成<textarea id="reviewDelayedTasks" data-review-field="delayed-tasks" rows="4"></textarea></label>
-        <label>今天学到了什么<textarea id="reviewLearnedToday" data-review-field="learned-today" rows="4"></textarea></label>
+    <details id="weeklyImprovementPanel" class="panel home-order-4 low-frequency-panel weekly-improvement-panel">
+      <summary>
+        <span><span class="step">滚动7日提升</span><strong>最近7天提升诊断</strong></span>
+        <strong id="weeklyImprovementSummaryStatus" class="weekly-improvement-status">证据积累中</strong>
+      </summary>
+      <div class="weekly-improvement-body">
+        <p id="weeklyImprovementRange" class="muted"></p>
+        <p id="weeklyImprovementEvidence" class="weekly-improvement-evidence"></p>
+        <div id="weeklyImprovementMetrics" class="weekly-improvement-metrics" aria-live="polite"></div>
+        <section id="weeklyImprovementPreviousAction" class="weekly-improvement-previous" hidden>
+          <div><span>上次动作复核</span><strong id="weeklyImprovementPreviousStatus">暂不能判断</strong></div>
+          <p id="weeklyImprovementPreviousText"></p>
+        </section>
+        <section class="weekly-improvement-diagnosis" aria-labelledby="weeklyImprovementDiagnosisTitle">
+          <p class="step">本轮主瓶颈</p>
+          <h3 id="weeklyImprovementDiagnosisTitle">正在根据正式证据判断</h3>
+          <ul id="weeklyImprovementDiagnosisEvidence"></ul>
+        </section>
+        <section class="weekly-improvement-action" aria-labelledby="weeklyImprovementActionTitle">
+          <p class="step">一条主动作</p>
+          <h3 id="weeklyImprovementActionTitle">下一轮只纠正这一件事</h3>
+          <label>可修改具体措辞和执行量；瓶颈与证据保持锁定
+            <textarea id="weeklyImprovementAction" rows="3" maxlength="300"></textarea>
+          </label>
+          <strong>两条守则</strong>
+          <ul id="weeklyImprovementGuardrails"></ul>
+          <p id="weeklyImprovementBinding" class="muted"></p>
+          <div class="button-row">
+            <button id="confirmWeeklyImprovementBtn" class="button primary" type="button">确认并冻结本次周动作</button>
+            <button id="bindWeeklyImprovementBtn" class="button secondary" type="button" hidden>绑定到下一轮计划</button>
+            <span id="weeklyImprovementStatus" class="status" aria-live="polite"></span>
+          </div>
+        </section>
       </div>
+    </details>
+
+    <section id="dailyCloseout" class="panel home-order-4" aria-labelledby="reviewTitle">
+      <p class="step">03 一键收工</p><h2 id="reviewTitle">用两句话完成今天的闭环</h2>
       <div id="focusOutputsReference" class="focus-output-reference" hidden>
         <strong>今日专注产出：</strong>
         <ul id="focusOutputsList"></ul>
       </div>
-      <label class="full-field">明天第一优先级<input id="reviewTomorrowPriority" data-review-field="tomorrow-priority" placeholder="明天开始后先做什么"></label>
-      <div class="button-row"><button id="saveReviewBtn" class="button primary" type="button">保存今日学习记录</button><span id="reviewSaveStatus" class="status" aria-live="polite"></span></div>
-    </section>
-
-    <section class="panel home-order-8" aria-labelledby="todaySnapshotTitle">
-      <p class="step">今日实际快照</p><h2 id="todaySnapshotTitle">导出或复制总控回传</h2>
-      <p class="muted">只读取正式保存的任务、专注、专业课和复盘结果；计划内容不会被当作实际完成。</p>
-      <div class="button-row">
-        <button id="exportTodaySnapshotBtn" class="button primary" type="button">导出今日快照 JSON</button>
-        <button id="copyControlMarkdownBtn" class="button secondary" type="button">复制总控回传版</button>
-        <span id="todaySnapshotStatus" class="status" aria-live="polite"></span>
+      <div class="daily-closeout-card">
+        <div class="daily-closeout-facts" aria-live="polite">
+          <div><span>今日总学习</span><strong id="closeoutStudyTime">未记录</strong></div>
+          <div><span>任务执行</span><strong id="closeoutTaskProgress">0/0</strong></div>
+          <div><span>正式结果</span><strong id="closeoutResultCount">0项</strong></div>
+          <div><span>滚动复盘</span><strong id="closeoutReviewCount">0项</strong></div>
+          <div><span>今日闭卷产物</span><strong id="closeoutClosedBookStatus">尚未保存</strong></div>
+        </div>
+        <p id="closeoutFactDetail" class="muted daily-closeout-detail">网站只汇总已经正式保存的数据，不根据专注时间推测完成。</p>
+        <div class="daily-closeout-fields">
+          <label>今日最重要产出或卡点<textarea id="reviewOutcomeNote" rows="3" maxlength="1000" placeholder="例如：闭卷重构剩余价值理论框架；卡在相对剩余价值与超额剩余价值的区分"></textarea></label>
+          <label>明日第一动作<input id="reviewTomorrowAction" maxlength="300" placeholder="例如：先闭卷重写今天遗漏的三个层次"></label>
+        </div>
+        <div class="button-row"><button id="saveReviewQuickBtn" class="button primary closeout-save-button" type="button">一键收工</button><span id="reviewQuickStatus" class="status" aria-live="polite"></span></div>
+        <section id="dailyAiReview" class="daily-ai-review" aria-labelledby="dailyAiReviewTitle" hidden>
+          <div class="daily-ai-review-heading">
+            <div><p class="step">AI 今日评价</p><h3 id="dailyAiReviewTitle">DeepSeek 评价与明日建议</h3></div>
+            <button id="regenerateDailyAiReviewBtn" class="button secondary" type="button">重新生成</button>
+          </div>
+          <p id="dailyAiReviewContent" class="daily-ai-review-content is-empty"></p>
+          <p id="dailyAiReviewMeta" class="muted daily-ai-review-meta"></p>
+          <span id="dailyAiReviewStatus" class="status" aria-live="polite"></span>
+        </section>
+        <section id="aiTomorrowPlan" class="ai-tomorrow-plan" aria-labelledby="aiTomorrowPlanTitle" hidden>
+          <div class="daily-ai-review-heading">
+            <div><p class="step">AI 明日计划</p><h3 id="aiTomorrowPlanTitle">结合今日进度安排明天</h3></div>
+            <button id="regenerateAiTomorrowPlanBtn" class="button secondary" type="button">重新生成</button>
+          </div>
+          <div id="aiPlanCalibration" class="ai-plan-calibration" hidden>
+            <strong>今日AI计划执行校准</strong>
+            <p id="aiPlanCalibrationFacts"></p>
+            <p id="aiPlanCalibrationTime" class="muted"></p>
+          </div>
+          <div id="aiTomorrowPlanSource" class="ai-plan-source" aria-live="polite">
+            <div class="ai-plan-source-heading">
+              <span id="aiTomorrowPlanSourceBadge" class="ai-plan-source-badge">原计划未核验</span>
+              <strong id="aiTomorrowPlanSourceName">尚未读取明日原计划</strong>
+            </div>
+            <p id="aiTomorrowPlanSourceMeta" class="muted"></p>
+            <p id="aiTomorrowPlanSourceMessage"></p>
+            <button id="aiTomorrowImportSourceBtn" class="button secondary" type="button" hidden>先导入8月6日总控计划</button>
+          </div>
+          <p id="aiTomorrowPlanSummary" class="muted">生成成功后自动导入明日计划；人工编辑和已有执行状态保持原样。</p>
+          <div id="aiTomorrowPlanList" class="ai-tomorrow-plan-list"></div>
+          <div id="aiTomorrowPlanConflicts" class="ai-tomorrow-plan-conflicts" aria-live="polite"></div>
+          <div class="button-row">
+            <button id="applyAiTomorrowPlanBtn" class="button success" type="button" hidden>应用到明日计划</button>
+            <span id="aiTomorrowPlanStatus" class="status" aria-live="polite"></span>
+          </div>
+        </section>
+        <section id="aiRollingWeekPlan" class="ai-tomorrow-plan" aria-labelledby="aiRollingWeekTitle" hidden>
+          <div class="daily-ai-review-heading">
+            <div><p class="step">AI 下一轮计划</p><h3 id="aiRollingWeekTitle">按真实进度续接未来7天</h3></div>
+            <button id="generateAiRollingWeekBtn" class="button secondary" type="button">生成7日计划</button>
+          </div>
+          <p id="aiRollingWeekRange" class="muted"></p>
+          <p id="aiRollingWeekCalibration" class="ai-plan-calibration-note"></p>
+          <div id="aiRollingWeekConstraint" class="weekly-plan-constraint" hidden></div>
+          <p class="muted">章节范围只取已导入阶段任务和已记录准确停点；生成后仅预览，需手动确认才会导入。</p>
+          <div id="aiRollingWeekList" class="ai-tomorrow-plan-list"></div>
+          <div class="button-row">
+            <button id="applyAiRollingWeekBtn" class="button success" type="button" hidden>确认导入7日计划</button>
+            <span id="aiRollingWeekStatus" class="status" aria-live="polite"></span>
+          </div>
+        </section>
       </div>
+      <details class="professional-advanced-editor review-advanced-editor" hidden>
+        <summary>高级编辑：逐项修改</summary>
+        <div class="field-grid two-columns">
+          <label>今天完成了什么<textarea id="reviewCompletedToday" data-review-field="completed-today" rows="4"></textarea></label>
+          <label>今天没完成什么<textarea id="reviewUnfinishedToday" data-review-field="unfinished-today" rows="4"></textarea></label>
+          <label>为什么没完成<textarea id="reviewDelayedTasks" data-review-field="delayed-tasks" rows="4"></textarea></label>
+          <label>今天学到了什么<textarea id="reviewLearnedToday" data-review-field="learned-today" rows="4"></textarea></label>
+        </div>
+        <label class="full-field">明天第一优先级<input id="reviewTomorrowPriority" data-review-field="tomorrow-priority" placeholder="明天开始后先做什么"></label>
+        <div class="button-row"><button id="saveReviewBtn" class="button primary" type="button">保存今日学习记录</button><span id="reviewSaveStatus" class="status" aria-live="polite"></span></div>
+      </details>
     </section>
 
-    <section class="panel home-order-9" aria-labelledby="historyTitle">
-      <p class="step">04 最近 7 天</p><h2 id="historyTitle">学习完成情况</h2>
-      <div id="recentSevenDays" class="seven-days"></div>
-      <h3>历史记录</h3>
-      <div id="historyList" class="history-list"></div>
-    </section>
+    <details id="todayDetailsPanel" class="panel home-order-6 low-frequency-panel">
+      <summary><span><span class="step">今日详情</span><strong>事实、快照与历史记录</strong></span></summary>
+      <div class="low-frequency-body today-details-body">
+        <section class="today-detail-block" aria-labelledby="factSummaryTitle">
+          <h2 id="factSummaryTitle">到期、逾期与未完成</h2>
+          <div class="fact-summary-grid">
+            <a href="#dueReviewsTitle"><span>今日到期复盘</span><strong id="summaryDueToday">0</strong></a>
+            <a href="#dueReviewsTitle"><span>逾期复盘</span><strong id="summaryOverdueReviews">0</strong></a>
+            <a href="#planTitle"><span>未完成学习任务</span><strong id="summaryUnfinishedTasks">0</strong></a>
+          </div>
+          <p><strong>当前进行中：</strong><span id="summaryInProgress">无</span></p>
+          <p><strong>超过计划时间仍未完成：</strong><span id="summaryScheduleOverdue">无</span></p>
+        </section>
+        <section class="today-detail-block" aria-labelledby="todaySnapshotTitle">
+          <h2 id="todaySnapshotTitle">导出或复制总控回传</h2>
+          <p class="muted">只读取正式保存的任务、专注、专业课和复盘结果；计划内容不会被当作实际完成。</p>
+          <div class="button-row">
+            <button id="exportTodaySnapshotBtn" class="button primary" type="button">导出今日快照 JSON</button>
+            <button id="copyControlMarkdownBtn" class="button secondary" type="button">复制总控回传版</button>
+            <span id="todaySnapshotStatus" class="status" aria-live="polite"></span>
+          </div>
+        </section>
+        <section class="today-detail-block" aria-labelledby="historyTitle">
+          <h2 id="historyTitle">最近 7 天与历史记录</h2>
+          <div id="recentSevenDays" class="seven-days"></div>
+          <h3>历史记录</h3>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </div>
+    </details>
 
-    <details id="systemToolsPanel" class="panel data-settings home-order-11 low-frequency-panel">
+    <details id="admissionReadinessPanel" class="panel home-order-7 admission-readiness-panel low-frequency-panel">
+      <summary><span><span class="step">南开上岸评估</span><strong>用模拟成绩判断初试目标达成可能性</strong></span><span id="admissionAssessmentStatus" class="admission-status">尚未建立目标线</span></summary>
+      <div class="low-frequency-body admission-readiness-body">
+        <p class="muted">只使用首次作答、严格限时、完整全真、统一评分且属于同一试卷体系的模拟成绩。每科至少5次后才输出条件概率区间；这不是最终录取概率。</p>
+        <section class="admission-section" aria-labelledby="admissionTargetTitle">
+          <h3 id="admissionTargetTitle">1. 设置经过核对的目标线</h3>
+          <div class="admission-target-grid">
+            <label>目标总分<input id="admissionTargetTotal" type="number" min="1" max="500" step="1" placeholder="不预填，需自行核对"></label>
+            <label>英语最低线<input id="admissionEnglishMinimum" type="number" min="0" max="100" step="1"></label>
+            <label>政治最低线<input id="admissionPoliticsMinimum" type="number" min="0" max="100" step="1"></label>
+            <label>722最低线<input id="admission722Minimum" type="number" min="0" max="150" step="1"></label>
+            <label>844最低线<input id="admission844Minimum" type="number" min="0" max="150" step="1"></label>
+            <label>目标线年份<input id="admissionBenchmarkYear" inputmode="numeric" maxlength="4" placeholder="例如：2025"></label>
+            <label class="admission-wide">来源说明<input id="admissionBenchmarkSource" maxlength="300" placeholder="例如：南开大学官方复试基本要求，需由本人核对"></label>
+          </div>
+          <div class="button-row"><button id="saveAdmissionConfigBtn" class="button secondary" type="button">保存目标线</button><span id="admissionConfigStatus" class="status" aria-live="polite"></span></div>
+        </section>
+        <section class="admission-section" aria-labelledby="admissionMockTitle">
+          <h3 id="admissionMockTitle">2. 记录一次模拟成绩</h3>
+          <div class="admission-mock-grid">
+            <label>日期<input id="admissionMockDate" type="date"></label>
+            <label>科目<select id="admissionMockSubject"><option value="english">英语</option><option value="politics">政治</option><option value="722">722</option><option value="844">844</option></select></label>
+            <label>作答类型<select id="admissionMockAttemptType"><option value="first">首次作答</option><option value="repeat">重做</option></select></label>
+            <label>成绩<input id="admissionMockScore" type="number" min="0" step="0.5"></label>
+            <label>实际用时（分钟）<input id="admissionMockDuration" type="number" min="1" max="360" step="1"></label>
+            <label>试卷体系<input id="admissionMockPaperSeries" maxlength="100" placeholder="例如：英语一历年真题"></label>
+            <label>试卷编号<input id="admissionMockPaperId" maxlength="100" placeholder="例如：2025真题或套卷03"></label>
+            <label>全科模拟批次（可留空）<input id="admissionMockBatchId" maxlength="100" placeholder="例如：2026-W32-01"></label>
+            <div class="admission-evidence-flags admission-wide">
+              <label class="admission-strict"><input id="admissionMockStrict" type="checkbox" checked>严格限时且未查资料</label>
+              <label class="admission-strict"><input id="admissionMockFullSimulation" type="checkbox" checked>完整题量并按正式条件作答</label>
+              <label class="admission-strict"><input id="admissionMockStandardScoring" type="checkbox" checked>使用统一且可复核的评分标准</label>
+            </div>
+            <label class="admission-wide">备注<input id="admissionMockNote" maxlength="300" placeholder="试卷来源、套卷名称或异常情况"></label>
+          </div>
+          <p class="muted">同一次全科模拟的四科填写相同批次编号，可跨两天完成；留空时仅进入单科独立模型。成绩都会保存，只有满足证据门禁的数据进入模型。</p>
+          <div class="button-row"><button id="saveAdmissionMockBtn" class="button primary" type="button">保存模拟成绩</button><span id="admissionMockStatus" class="status" aria-live="polite"></span></div>
+        </section>
+        <section class="admission-section" aria-labelledby="admissionResultTitle">
+          <h3 id="admissionResultTitle">3. 当前评估</h3>
+          <div id="admissionAssessmentMetrics" class="admission-metrics"></div>
+          <div id="admissionAssessmentDetails"></div>
+        </section>
+        <details class="admission-records-details"><summary>查看最近模拟成绩</summary><div id="admissionMockRecords" class="admission-mock-records"></div></details>
+      </div>
+    </details>
+
+    <details id="systemToolsPanel" class="panel data-settings home-order-8 low-frequency-panel">
       <summary><span><span class="step">09 系统工具</span><strong id="dataTitle">数据安全、迁移与低频设置</strong></span></summary>
       <div class="data-settings-body">
         <p class="muted">完整导出包含当前浏览器中的全部字段，包括网站已停止使用的旧数据。</p>
@@ -199,13 +522,8 @@
             <span id="migrationStatus" class="status" aria-live="polite"></span>
           </div>
         </details>
-        <div class="exam-stats-setting">
-          <label>考研统计开始日期<input id="examStatsStartDate" type="date"></label>
-          <button id="saveExamStatsStartDateBtn" class="button ghost" type="button">保存开始日期</button>
-          <span id="examStatsStartStatus" class="status" aria-live="polite"></span>
-          <p id="examStatsStartHint" class="muted"></p>
-        </div>
         <div class="button-row">
+          <button id="importControlPlanBtn" class="button primary" type="button">导入8月6日总控计划</button>
           <button id="exportJsonBtn" class="button primary" type="button">导出完整 JSON</button>
           <button id="importJsonBtn" class="button secondary" type="button">导入新版计划 / 完整备份</button>
           <button id="clearLearningDataBtn" class="button danger" type="button">清空学习数据</button>
@@ -250,6 +568,7 @@
       <p class="step">专注模式</p><h2 id="focusModeTitle">当前只做这一件事</h2>
       <p id="focusModeTask" class="focus-task">尚未选择任务</p>
       <p id="focusModeOutput" class="focus-description muted"></p>
+      <div id="focusModeExecutionBrief" class="execution-brief focus-execution-brief" hidden></div>
       <label class="focus-round-goal">本轮目标<input id="focusModeGoalInput" maxlength="120" placeholder="写下这一轮要完成的具体结果"></label>
       <div class="focus-mode-selector focus-overlay-selector" aria-label="专注模式计时选择">
         <button id="focusModeFreeBtn" class="button focus-mode-button" type="button" aria-pressed="true">自由专注</button>
@@ -272,6 +591,36 @@
         <span id="focusThoughtStatus" class="status" aria-live="polite"></span>
       </div>
     </section>
+    <section id="focusRecoveryCard" class="focus-card focus-recovery-card" role="dialog" aria-modal="true" aria-labelledby="focusRecoveryTitle" hidden>
+      <p class="step">返回学习</p>
+      <h2 id="focusRecoveryTitle">不用重新计划，继续刚才的任务</h2>
+      <p id="focusRecoveryTask" class="focus-wrapup-task"></p>
+      <div class="focus-wrapup-summary" aria-live="polite">
+        <span><span id="focusRecoveryTimeLabel">本轮剩余</span><strong id="focusRecoveryTime">00:00</strong></span>
+      </div>
+      <p class="focus-recovery-note">切换标签页时继续学习计时；页面关闭、刷新或心跳中断时会安全暂停并保留进度。</p>
+      <div class="focus-recovery-actions">
+        <button id="focusRecoveryContinueBtn" class="button success focus-recovery-primary" type="button">继续当前任务</button>
+        <button id="focusRecoveryShrinkBtn" class="button secondary" type="button">任务太难，缩小到一个动作</button>
+      </div>
+      <label class="focus-recovery-pause">确有急事时，只写一句<input id="focusRecoveryPauseInput" maxlength="120" placeholder="例如：接电话，处理完立即回来"></label>
+      <button id="focusRecoveryPauseBtn" class="button ghost" type="button">记录后暂停</button>
+      <span id="focusRecoveryStatus" class="status" aria-live="polite"></span>
+    </section>
+    <section id="focusStartupChoiceCard" class="focus-card focus-startup-choice-card" role="dialog" aria-modal="true" aria-labelledby="focusStartupChoiceTitle" hidden>
+      <p class="step">5分钟启动完成</p>
+      <h2 id="focusStartupChoiceTitle">已经开始了，下一步只选一个</h2>
+      <p id="focusStartupTask" class="focus-wrapup-task"></p>
+      <div class="focus-wrapup-summary" aria-live="polite">
+        <span>本轮实际专注 <strong id="focusStartupDuration">00:05:00</strong></span>
+      </div>
+      <label class="focus-startup-blocker">如果现在停下，具体卡在哪里？<input id="focusStartupBlockerInput" maxlength="120" placeholder="例如：找不到教材起点；概念边界不清"></label>
+      <div class="button-row">
+        <button id="focusStartupContinueBtn" class="button success" type="button">继续25分钟</button>
+        <button id="focusStartupPauseBtn" class="button secondary" type="button">记录卡点并暂停</button>
+      </div>
+      <span id="focusStartupChoiceStatus" class="status" aria-live="polite"></span>
+    </section>
     <section id="focusWrapupCard" class="focus-card focus-wrapup-card" role="dialog" aria-modal="true" aria-labelledby="focusWrapupTitle" hidden>
       <p class="step">本轮专注收尾</p>
       <h2 id="focusWrapupTitle">用两句话结束这一轮</h2>
@@ -290,21 +639,86 @@
         <button id="skipWrapupBtn" class="button ghost" type="button">跳过</button>
       </div>
     </section>
+    <section id="focusReviewResultCard" class="focus-card focus-review-result-card" role="dialog" aria-modal="true" aria-labelledby="focusReviewResultTitle" hidden>
+      <p class="step">复盘专注已结算</p>
+      <h2 id="focusReviewResultTitle">留下本次闭卷证据</h2>
+      <p id="focusReviewResultMeta" class="focus-wrapup-task"></p>
+      <div class="focus-wrapup-summary" aria-live="polite">
+        <span>本轮实际专注 <strong id="focusReviewResultDuration">00:05:00</strong></span>
+      </div>
+      <div id="focusReviewEvidenceStep" class="focus-review-evidence-step">
+        <label for="focusReviewEvidence">三行闭卷证据</label>
+        <textarea id="focusReviewEvidence" rows="7" maxlength="2600" spellcheck="false">记住了=
+遗漏了=
+下一步=</textarea>
+        <small id="focusReviewEvidenceHint">请先填写“记住了”，再根据真实表现判断结果。</small>
+        <div id="focusReviewSourceContext" class="review-source-context" hidden></div>
+        <div class="focus-review-result-actions">
+          <button class="button success" type="button" data-focus-review-result="passed" disabled>通过</button>
+          <button class="button secondary" type="button" data-focus-review-result="partial" disabled>部分通过</button>
+          <button class="button ghost" type="button" data-focus-review-result="failed" disabled>未通过</button>
+        </div>
+        <button id="focusReviewLaterBtn" class="button ghost" type="button">稍后填写，保留未完成</button>
+      </div>
+      <div id="focusReviewHandoffStep" class="focus-review-handoff-step" hidden>
+        <strong id="focusReviewSavedMessage">复盘结果已保存</strong>
+        <p id="focusReviewNextMessage"></p>
+        <div class="button-row">
+          <button id="focusReviewNextBtn" class="button primary" type="button" hidden>下一条复盘5分钟</button>
+          <button id="focusReviewReturnBtn" class="button secondary" type="button">返回执行台</button>
+        </div>
+      </div>
+      <span id="focusReviewResultStatus" class="status" aria-live="polite"></span>
+    </section>
+    <section id="focusResultHandoffCard" class="focus-card focus-result-handoff-card" role="dialog" aria-modal="true" aria-labelledby="focusResultHandoffTitle" hidden>
+      <p class="step">本轮结果已保存</p>
+      <h2 id="focusResultHandoffTitle">正式结果已进入今日记录</h2>
+      <p id="focusResultHandoffNext" class="focus-result-handoff-next"></p>
+      <p id="focusResultHandoffDescription" class="focus-description muted"></p>
+      <div id="focusResultHandoffBrief" class="execution-brief focus-execution-brief" hidden></div>
+      <div class="focus-result-handoff-actions">
+        <button id="focusResultHandoffStartBtn" class="button primary" type="button">先做下一项5分钟</button>
+        <button id="focusResultHandoffFreeBtn" class="button secondary" type="button" hidden>下一项自由专注</button>
+        <button id="focusResultHandoffLaterBtn" class="button ghost" type="button">稍后再做</button>
+      </div>
+      <span id="focusResultHandoffStatus" class="status" aria-live="polite"></span>
+    </section>
   </div>
 
-  <script src="js/plan-window-core.js"></script>
-  <script src="js/p0-final-core.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/p0-results.js"></script>
-  <script src="js/migrations.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/focus-timer-core.js"></script>
-  <script src="js/tasks.js"></script>
-  <script src="js/study-time.js"></script>
-  <script src="js/exam-stats.js"></script>
-  <script src="js/review.js"></script>
-  <script src="js/data-safety.js"></script>
-  <script src="js/p0-final.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/execution-state-core.js?v=review-focus-loop-v142"></script>
+  <script src="js/plan-window-core.js?v=next-task-order-v146"></script>
+  <script src="js/ai-tomorrow-plan-core.js?v=english-split-v145"></script>
+  <script src="js/ai-rolling-week-plan-core.js?v=weekly-improvement-v154"></script>
+  <script src="js/admission-readiness-core.js?v=admission-joint-v114"></script>
+  <script src="js/progress-runner-core.js?v=execution-target-v126"></script>
+  <script src="js/p0-final-core.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/p1-results-core.js?v=reading-notes-v116"></script>
+  <script src="js/p1-output-core.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/p1-integration-core.js?v=schedule-transition-v149"></script>
+  <script src="js/weekly-improvement-core.js?v=weekly-improvement-v154"></script>
+  <script src="js/offline-sync-core.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync-core.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync-transport.js?v=magic-link-v158"></script>
+  <script src="js/storage.js?v=offline-sync-v155"></script>
+  <script src="js/p0-results.js?v=safe-date-rollover-v153"></script>
+  <script src="js/migrations.js?v=magic-link-v158"></script>
+  <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/focus-timer-core.js?v=review-recovery-v143"></script>
+  <script src="js/tasks.js?v=weekly-improvement-v154"></script>
+  <script src="js/study-time.js?v=weekly-improvement-v154"></script>
+  <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
+  <script src="js/review.js?v=weekly-improvement-v154"></script>
+  <script src="js/nankai-control-plan-2026-08-06.js?v=control-plan-import-v105"></script>
+  <script src="js/data-safety.js?v=magic-link-v158"></script>
+  <script src="js/p1-results.js?v=reading-notes-v116"></script>
+  <script src="js/p1-output.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/p1-integration.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/weekly-improvement.js?v=weekly-improvement-v154"></script>
+  <script src="js/progress-runner.js?v=execution-target-v126"></script>
+  <script src="js/p0-final.js?v=next-task-reveal-v147"></script>
+  <script src="js/offline-sync.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync.js?v=magic-link-v158"></script>
+  <script src="js/app.js?v=magic-link-v158"></script>
 </body>
 </html>

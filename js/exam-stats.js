@@ -133,11 +133,13 @@ function getExamStatsSummary() {
     const eligibleFocusSeconds = Math.max(0, focusSeconds - excludedFocusSeconds);
     distributeFocusSeconds(subjectTotals, eligibleFocusSeconds, focusEntries.filter((entry) => entry.subjectId));
 
-    const liveManualRecords = manualRecords.filter((record) => record.date === dateKey && !isExcludedManualStudyTask(record));
+    const liveManualRecordsForDate = manualRecords.filter((record) => record.date === dateKey);
+    const liveManualRecords = liveManualRecordsForDate.filter((record) => !isExcludedManualStudyTask(record));
     const savedManualRecords = historyRecord && Array.isArray(historyRecord.manualTimeRecords)
       ? historyRecord.manualTimeRecords.filter((record) => !isExcludedManualStudyTask(record))
       : [];
-    const detailedManualRecords = liveManualRecords.length || (historyRecord && historyRecord.manualRecordsSaved)
+    const hasCanonicalManualRecords = liveManualRecordsForDate.length || (historyRecord && historyRecord.manualRecordsSaved);
+    const detailedManualRecords = hasCanonicalManualRecords
       ? liveManualRecords
       : savedManualRecords;
     let manualSeconds = 0;
@@ -147,13 +149,13 @@ function getExamStatsSummary() {
       const task = findExamTask(dateKey, record.taskId, historyRecord, plans);
       addCategorizedSeconds(subjectTotals, classifyExamSubject({ ...task, ...record, category: task.category || record.category }), seconds);
     });
-    if (!detailedManualRecords.length && !(historyRecord && historyRecord.manualRecordsSaved)) {
+    if (!detailedManualRecords.length && !hasCanonicalManualRecords) {
       manualSeconds = Math.max(0, Math.floor(Number(historyRecord && historyRecord.manualStudySeconds) || 0));
       addCategorizedSeconds(subjectTotals, "general", manualSeconds);
     }
 
     let dailyTotal = eligibleFocusSeconds + manualSeconds;
-    if (historyRecord && !historyRecord.manualRecordsSaved) {
+    if (historyRecord && !hasCanonicalManualRecords && !historyRecord.manualRecordsSaved) {
       const legacyTotal = Math.max(0, Math.floor(Number(historyRecord.totalStudySeconds) || 0));
       if (legacyTotal > dailyTotal) {
         addCategorizedSeconds(subjectTotals, "general", legacyTotal - dailyTotal);
@@ -238,5 +240,6 @@ function saveExamStatsStartDate() {
 function initExamStats() {
   renderExamStatsConfig();
   renderExamStatsOverview();
-  document.querySelector("#saveExamStatsStartDateBtn").addEventListener("click", saveExamStatsStartDate);
+  const saveButton = document.querySelector("#saveExamStatsStartDateBtn");
+  if (saveButton) saveButton.addEventListener("click", saveExamStatsStartDate);
 }

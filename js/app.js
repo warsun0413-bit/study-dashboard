@@ -1,4 +1,48 @@
 // v6.0 core-only application bootstrap.
+let scheduleBoundaryRefreshTimerId = null;
+let lastScheduleBoundaryMinuteKey = "";
+let renderedDashboardDateKey = "";
+
+function getScheduleBoundaryMinuteKey(now = new Date()) {
+  return `${getDateKey(now)}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function getNextScheduleBoundaryDelay(nowMilliseconds = Date.now()) {
+  const elapsedInMinute = ((Number(nowMilliseconds) % 60000) + 60000) % 60000;
+  return 60000 - elapsedInMinute + 75;
+}
+
+function refreshScheduleBoundary({ force = false, now = new Date() } = {}) {
+  const minuteKey = getScheduleBoundaryMinuteKey(now);
+  const nextDateKey = getDateKey(now);
+  if (!force && minuteKey === lastScheduleBoundaryMinuteKey) return false;
+  const dateChanged = Boolean(renderedDashboardDateKey && renderedDashboardDateKey !== nextDateKey);
+  const refresh = dateChanged ? refreshDashboardForDateRollover : refreshScheduleBoundDashboardUi;
+  if (typeof refresh !== "function" || !refresh()) return false;
+  renderedDashboardDateKey = nextDateKey;
+  lastScheduleBoundaryMinuteKey = minuteKey;
+  return true;
+}
+
+function queueNextScheduleBoundaryRefresh() {
+  if (scheduleBoundaryRefreshTimerId !== null) window.clearTimeout(scheduleBoundaryRefreshTimerId);
+  scheduleBoundaryRefreshTimerId = window.setTimeout(() => {
+    refreshScheduleBoundary();
+    queueNextScheduleBoundaryRefresh();
+  }, getNextScheduleBoundaryDelay());
+}
+
+function initScheduleBoundaryRefresh() {
+  const now = new Date();
+  renderedDashboardDateKey = getDateKey(now);
+  lastScheduleBoundaryMinuteKey = getScheduleBoundaryMinuteKey(now);
+  queueNextScheduleBoundaryRefresh();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshScheduleBoundary();
+  });
+  window.addEventListener("pageshow", () => refreshScheduleBoundary());
+}
+
 function initApp() {
   runDataMigrations({ source: "app-start", todayKey: getDateKey() });
   ensureDataSchema();
@@ -7,17 +51,29 @@ function initApp() {
   renderTasks();
   initP0Checkpoint2();
   loadReviewFields();
+  initDailyReviewQuickRecord();
   bindReviewAutoSaving();
   bindTaskControls();
   restorePomodoroStateFromStorage();
   initStudyTime();
   initExamStats();
+  initAdmissionReadiness();
   initP0Final();
+  initP1Results();
+  initP1Output();
+  initP1Integration();
+  initStudyProgressRunner();
+  initWeeklyImprovement();
   renderHistory();
   renderRecentSevenDays();
+  initScheduleBoundaryRefresh();
+  initOfflineSync();
+  initCloudSync();
 
   document.querySelector("#saveReviewBtn").addEventListener("click", saveTodayReview);
   document.querySelector("#exportJsonBtn").addEventListener("click", downloadJsonBackup);
+  document.querySelector("#importControlPlanBtn").addEventListener("click", importBuiltInNankaiControlPlan);
+  document.querySelector("#aiTomorrowImportSourceBtn").addEventListener("click", importBuiltInNankaiControlPlan);
   document.querySelector("#importJsonBtn").addEventListener("click", () => document.querySelector("#importJsonInput").click());
   document.querySelector("#importJsonInput").addEventListener("change", (event) => {
     const file = event.target.files && event.target.files[0];

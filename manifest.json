@@ -7,5 +7,13 @@
   "display": "standalone",
   "background_color": "#f4f6f3",
   "theme_color": "#315c4c",
-  "lang": "zh-CN"
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./study-dashboard-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
