@@ -74,6 +74,9 @@ function renderP0Priorities() {
     const link = document.createElement("a");
     link.className = "priority-item next-priority-item";
     link.href = "#planTitle";
+    link.addEventListener("click", (event) => {
+      if (typeof revealTodayPlanTask === "function" && revealTodayPlanTask(priority.targetId)) event.preventDefault();
+    });
     const rank = document.createElement("strong"); rank.textContent = "→";
     const content = document.createElement("span");
     const title = document.createElement("b"); title.textContent = priority.title;

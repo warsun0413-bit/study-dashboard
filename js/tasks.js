@@ -472,6 +472,22 @@ function performUnifiedTaskAction(task, actionName, contextId = "") {
   return actionName === "unified-done";
 }
 
+function revealTodayPlanTask(taskId) {
+  const normalizedId = String(taskId || "");
+  if (!normalizedId) return false;
+  const panel = document.querySelector("#todayPlanPanel");
+  if (panel) panel.open = true;
+  const row = [...document.querySelectorAll("#taskList .task-row[data-task-id]")]
+    .find((item) => item.dataset.taskId === normalizedId);
+  if (!row) return false;
+  row.classList.remove("is-revealed");
+  row.classList.add("is-revealed");
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => row.classList.remove("is-revealed"), 1800);
+  return true;
+}
+
 function renderTasks() {
   const list = document.querySelector("#taskList");
   const plan = getTodayPlan();
@@ -482,6 +498,8 @@ function renderTasks() {
     const status = getTaskStatus(task);
     const row = document.createElement("article");
     row.className = `task-row status-${status}${task.exercise ? " exercise-task" : ""}${!isCountedLearningTask(task) && !task.exercise ? " life-task" : ""}`;
+    row.dataset.taskId = String(task.id || task.taskId || "");
+    row.tabIndex = -1;
     const time = document.createElement("strong");
     time.className = "task-time";
     time.textContent = task.time || "自定";

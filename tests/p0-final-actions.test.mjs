@@ -166,11 +166,11 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(indexSource, /js\/p0-final\.js\?v=next-task-order-v146/);
+  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(indexSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=next-task-order-v146/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
 });
 
 test("all takeover builders return views instead of writing cockpit fields", () => {
@@ -250,9 +250,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
+  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -348,6 +348,16 @@ test("timetable and next-task preview reuse the shared execution brief", () => {
   assert.doesNotMatch(source, /getTaskExecutionBrief\(priorityTask\)[\s\S]*writeJson|saveTodayPlan|startPomodoro/);
 });
 
+test("the next-task link reveals its exact timetable row without changing execution state", () => {
+  assert.match(tasksSource, /row\.dataset\.taskId = String\(task\.id \|\| task\.taskId \|\| ""\)/);
+  assert.match(tasksSource, /row\.tabIndex = -1/);
+  assert.match(tasksSource, /function revealTodayPlanTask\(taskId\)[\s\S]*panel\.open = true[\s\S]*item\.dataset\.taskId === normalizedId[\s\S]*row\.focus\(\{ preventScroll: true \}\)[\s\S]*row\.scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/);
+  assert.match(source, /link\.addEventListener\("click", \(event\) => \{[\s\S]*revealTodayPlanTask\(priority\.targetId\)[\s\S]*event\.preventDefault\(\)/);
+  assert.match(styleSource, /\.task-row\.is-revealed[\s\S]*@keyframes reveal-task-row[\s\S]*prefers-reduced-motion/);
+  const revealBlock = tasksSource.slice(tasksSource.indexOf("function revealTodayPlanTask"), tasksSource.indexOf("function renderTasks"));
+  assert.doesNotMatch(revealBlock, /saveTodayPlan|writeJson|localStorage|setTaskStatus|startPomodoro|startImmersiveFocus/);
+});
+
 test("successful formal results return one transient receipt and prepare the next task without auto-start", () => {
   assert.match(indexSource, /id="resultHandoffReceipt" class="result-handoff-receipt" hidden/);
   assert.match(indexSource, /id="resultHandoffTitle"/);
@@ -436,13 +446,13 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="resultHandoffBrief"/);
   assert.match(indexSource, /id="focusModeExecutionBrief"/);
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
-  assert.match(indexSource, /style\.css\?v=review-free-focus-v144/);
+  assert.match(indexSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /study-dashboard-next-task-order-v146/);
-  assert.match(serviceWorkerSource, /style\.css\?v=review-free-focus-v144/);
+  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /study-dashboard-next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
   assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
   assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
@@ -563,9 +573,9 @@ test("review focus closes directly into evidence result and the next review hand
   assert.doesNotMatch(deferBlock, /saveDueReviewResult|applyReviewResult|writeJson/);
   assert.match(executionStateSource, /const contextMismatch = Boolean\(contextId && primaryContextId && contextId !== primaryContextId\)/);
   assert.match(executionStateSource, /\["mode", "kind", "action", "taskId", "contextId", "taskAction"\]/);
-  assert.match(indexSource, /style\.css\?v=review-free-focus-v144/);
+  assert.match(indexSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
-  assert.match(serviceWorkerSource, /style\.css\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
 });
 
@@ -587,8 +597,8 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.match(tasksSource, /function returnFromFocusReview\(\)[\s\S]*复盘结果未保存[\s\S]*pendingFocusReview = null/);
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /study-dashboard-next-task-order-v146/);
+  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /study-dashboard-next-task-reveal-v147/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {

@@ -213,6 +213,15 @@ textarea { resize: vertical; }
 .task-row.status-completed { background: var(--primary-soft); }
 .task-row.status-completed > div:nth-child(2) > strong { color: var(--muted); text-decoration: line-through; }
 .task-row.status-in-progress { border-color: #8fb5a3; box-shadow: inset 3px 0 var(--primary); }
+.task-row.is-revealed { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); animation: reveal-task-row 1.8s ease-out; }
+.task-row:focus { outline: 2px solid var(--primary); outline-offset: 3px; }
+@keyframes reveal-task-row {
+  0%, 55% { background: #e7f2ec; }
+  100% { background: #fbfcfb; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-row.is-revealed { animation: none; }
+}
 .task-row.status-skipped { opacity: .65; }
 .task-row.life-task { background: #f7f7f5; }
 .task-row.exercise-task { background: #f4f7fb; }
