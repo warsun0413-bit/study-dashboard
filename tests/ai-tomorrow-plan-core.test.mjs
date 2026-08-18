@@ -257,7 +257,7 @@ test("new plan core remains loaded before review in the current cache", () => {
   assert.match(serviceWorkerSource, /js\/ai-tomorrow-plan-core\.js\?v=english-split-v145/);
   assert.match(indexSource, /js\/review\.js\?v=weekly-improvement-v154/);
   assert.match(serviceWorkerSource, /js\/review\.js\?v=weekly-improvement-v154/);
-  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-dashboard-local-offline-v159/);
   assert.doesNotMatch(serviceWorkerSource, /ai-tomorrow-plan-v91|deepseek-daily-review-v90/);
 });
 

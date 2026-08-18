@@ -333,7 +333,6 @@ function applyStorageSnapshotTransaction(targetSnapshot, operationId, downloadBa
       else localStorage.setItem(change.key, change.afterValue);
       applied.push(change);
     });
-    if (typeof captureOfflineSyncTransaction === "function") captureOfflineSyncTransaction(changes);
     return { changedKeys: changes.length, status: "completed" };
   } catch (error) {
     [...applied].reverse().forEach((change) => {

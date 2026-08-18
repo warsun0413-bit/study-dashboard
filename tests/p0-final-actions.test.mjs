@@ -454,11 +454,11 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="resultHandoffBrief"/);
   assert.match(indexSource, /id="focusModeExecutionBrief"/);
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
-  assert.match(indexSource, /style\.css\?v=magic-link-v158/);
+  assert.match(indexSource, /style\.css\?v=local-offline-v159/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
   assert.match(indexSource, /js\/tasks\.js\?v=weekly-improvement-v154/);
-  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
-  assert.match(serviceWorkerSource, /style\.css\?v=magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-dashboard-local-offline-v159/);
+  assert.match(serviceWorkerSource, /style\.css\?v=local-offline-v159/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
   assert.match(serviceWorkerSource, /js\/tasks\.js\?v=weekly-improvement-v154/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
@@ -596,9 +596,9 @@ test("review focus closes directly into evidence result and the next review hand
   assert.doesNotMatch(deferBlock, /saveDueReviewResult|applyReviewResult|writeJson/);
   assert.match(executionStateSource, /const contextMismatch = Boolean\(contextId && primaryContextId && contextId !== primaryContextId\)/);
   assert.match(executionStateSource, /\["mode", "kind", "action", "taskId", "contextId", "taskAction"\]/);
-  assert.match(indexSource, /style\.css\?v=magic-link-v158/);
+  assert.match(indexSource, /style\.css\?v=local-offline-v159/);
   assert.match(indexSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
-  assert.match(serviceWorkerSource, /style\.css\?v=magic-link-v158/);
+  assert.match(serviceWorkerSource, /style\.css\?v=local-offline-v159/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
 });
 
@@ -621,7 +621,7 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
   assert.match(indexSource, /js\/tasks\.js\?v=weekly-improvement-v154/);
-  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-dashboard-local-offline-v159/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {
