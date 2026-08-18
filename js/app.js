@@ -67,8 +67,7 @@ function initApp() {
   renderHistory();
   renderRecentSevenDays();
   initScheduleBoundaryRefresh();
-  initOfflineSync();
-  initCloudSync();
+  initOfflineStorage();
 
   document.querySelector("#saveReviewBtn").addEventListener("click", saveTodayReview);
   document.querySelector("#exportJsonBtn").addEventListener("click", downloadJsonBackup);

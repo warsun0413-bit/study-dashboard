@@ -91,6 +91,6 @@ test("time interval UI and cache assets are current", () => {
   assert.match(indexSource, /id="todayPlanStudyTarget"/);
   assert.match(indexSource, /id="todayStudyTargetSource"/);
   assert.match(indexSource, /study-time\.js\?v=weekly-improvement-v154/);
-  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-dashboard-local-offline-v159/);
   assert.match(serviceWorkerSource, /study-time\.js\?v=weekly-improvement-v154/);
 });

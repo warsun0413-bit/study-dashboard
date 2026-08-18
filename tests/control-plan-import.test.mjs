@@ -80,14 +80,14 @@ test("built-in import is visible, wired through preview, and cached", () => {
   assert.match(indexSource, /id="importControlPlanBtn"/);
   assert.match(indexSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
   assert.match(indexSource, /plan-window-core\.js\?v=next-task-order-v146/);
-  assert.match(indexSource, /data-safety\.js\?v=magic-link-v158/);
-  assert.match(indexSource, /app\.js\?v=magic-link-v158/);
+  assert.match(indexSource, /data-safety\.js\?v=local-offline-v159/);
+  assert.match(indexSource, /app\.js\?v=local-offline-v159/);
   assert.match(appSource, /importControlPlanBtn[\s\S]*importBuiltInNankaiControlPlan/);
   assert.match(safetySource, /importNankaiPlan\(NANKAI_CONTROL_PLAN_20260806\)/);
   assert.match(safetySource, /\n\s+detailedPlanDates,/);
   assert.match(safetySource, /typeof renderAiTomorrowPlanPreview === "function"/);
-  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
-  assert.match(serviceWorkerSource, /data-safety\.js\?v=magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-dashboard-local-offline-v159/);
+  assert.match(serviceWorkerSource, /data-safety\.js\?v=local-offline-v159/);
   assert.match(serviceWorkerSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
   assert.match(serviceWorkerSource, /plan-window-core\.js\?v=next-task-order-v146/);
   assert.match(serviceWorkerSource, /tasks\.js\?v=weekly-improvement-v154/);

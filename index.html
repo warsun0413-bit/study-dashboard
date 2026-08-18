@@ -11,7 +11,7 @@
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="study-dashboard-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=magic-link-v158">
+  <link rel="stylesheet" href="style.css?v=local-offline-v159">
 </head>
 <body>
   <header class="site-header">
@@ -20,39 +20,14 @@
       <h1>南开马理论考研任务面板</h1>
       <p id="todayDate" class="muted"></p>
     </div>
-    <aside class="offline-sync-card" aria-labelledby="offlineSyncStatus">
-      <strong id="offlineSyncStatus">正在检查离线记录</strong>
-      <small id="offlineSyncDetail">本阶段只建立本机待上传队列，不上传真实数据。</small>
-      <small>只接受 Supabase Publishable key；不会接收 Secret 或 service_role 密钥。</small>
-      <div class="offline-sync-actions">
+    <aside class="offline-storage-card" aria-labelledby="offlineStorageStatus">
+      <strong id="offlineStorageStatus">正在检查本机记录</strong>
+      <small id="offlineStorageDetail">学习记录保存在当前浏览器；跨设备请使用完整 JSON 备份与恢复。</small>
+      <div class="offline-storage-actions">
         <button id="protectOfflineStorageBtn" class="button secondary" type="button">保护本机记录</button>
         <button id="installOfflineDashboardBtn" class="button ghost" type="button">安装到 iPad</button>
-        <button id="uploadOfflineSyncBtn" class="button ghost" type="button">连接云端</button>
       </div>
-      <details id="cloudSyncSetup" class="cloud-sync-setup">
-        <summary>云端同步设置</summary>
-        <div class="cloud-sync-fields">
-          <label>Supabase 项目地址
-            <input id="cloudSyncProjectUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://项目代号.supabase.co">
-          </label>
-          <label>Publishable key
-            <input id="cloudSyncPublishableKey" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_...">
-          </label>
-          <label>登录邮箱
-            <input id="cloudSyncEmail" type="email" inputmode="email" autocomplete="email" placeholder="你的邮箱">
-          </label>
-          <p>使用 Supabase 默认 Magic Link：邮件链接返回本页后会自动登录。部署后需把本页 HTTPS 地址加入 Supabase 的 Redirect URLs。</p>
-          <div class="cloud-sync-buttons">
-            <button id="saveCloudSyncConfigBtn" class="button ghost" type="button">保存设备配置</button>
-            <button id="sendCloudSyncMagicLinkBtn" class="button secondary" type="button">发送登录链接</button>
-          </div>
-          <div class="cloud-sync-buttons">
-            <button id="initializeCloudDeviceBtn" class="button secondary" type="button" hidden>从云端初始化本设备</button>
-            <button id="signOutCloudSyncBtn" class="button ghost" type="button" hidden>退出云端登录</button>
-          </div>
-        </div>
-      </details>
-      <span id="offlineSyncActionStatus" class="status" aria-live="polite"></span>
+      <span id="offlineStorageActionStatus" class="status" aria-live="polite"></span>
     </aside>
   </header>
 
@@ -696,12 +671,9 @@
   <script src="js/p1-output-core.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration-core.js?v=schedule-transition-v149"></script>
   <script src="js/weekly-improvement-core.js?v=weekly-improvement-v154"></script>
-  <script src="js/offline-sync-core.js?v=magic-link-v158"></script>
-  <script src="js/cloud-sync-core.js?v=magic-link-v158"></script>
-  <script src="js/cloud-sync-transport.js?v=magic-link-v158"></script>
-  <script src="js/storage.js?v=offline-sync-v155"></script>
+  <script src="js/storage.js?v=local-offline-v159"></script>
   <script src="js/p0-results.js?v=safe-date-rollover-v153"></script>
-  <script src="js/migrations.js?v=magic-link-v158"></script>
+  <script src="js/migrations.js?v=local-offline-v159"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=review-recovery-v143"></script>
   <script src="js/tasks.js?v=weekly-improvement-v154"></script>
@@ -710,15 +682,14 @@
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
   <script src="js/review.js?v=weekly-improvement-v154"></script>
   <script src="js/nankai-control-plan-2026-08-06.js?v=control-plan-import-v105"></script>
-  <script src="js/data-safety.js?v=magic-link-v158"></script>
+  <script src="js/data-safety.js?v=local-offline-v159"></script>
   <script src="js/p1-results.js?v=reading-notes-v116"></script>
   <script src="js/p1-output.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration.js?v=ai-plan-calibration-v92"></script>
   <script src="js/weekly-improvement.js?v=weekly-improvement-v154"></script>
   <script src="js/progress-runner.js?v=execution-target-v126"></script>
   <script src="js/p0-final.js?v=next-task-reveal-v147"></script>
-  <script src="js/offline-sync.js?v=magic-link-v158"></script>
-  <script src="js/cloud-sync.js?v=magic-link-v158"></script>
-  <script src="js/app.js?v=magic-link-v158"></script>
+  <script src="js/offline-local.js?v=local-offline-v159"></script>
+  <script src="js/app.js?v=local-offline-v159"></script>
 </body>
 </html>

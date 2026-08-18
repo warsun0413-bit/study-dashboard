@@ -239,7 +239,7 @@ test("page cache and backup path expose the folded explicit-confirm workflow", (
   assert.match(storage, /studyWeeklyImprovementRecords/);
   assert.doesNotMatch(storage, /writeJson\(weeklyImprovementRecordsKey/);
   assert.match(backup, /for \(let index = 0; index < localStorage\.length/);
-  assert.match(worker, /study-dashboard-magic-link-v158/);
+  assert.match(worker, /study-dashboard-local-offline-v159/);
   assert.match(worker, /weekly-improvement\.js\?v=weekly-improvement-v154/);
   const review = fs.readFileSync(new URL("../js/review.js", import.meta.url), "utf8");
   assert.match(review, /renderAiRollingWeekImprovementConstraint\(constraint, imported\.improvementConstraint \|\| null\)/);
