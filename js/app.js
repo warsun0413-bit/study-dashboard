@@ -63,9 +63,12 @@ function initApp() {
   initP1Output();
   initP1Integration();
   initStudyProgressRunner();
+  initWeeklyImprovement();
   renderHistory();
   renderRecentSevenDays();
   initScheduleBoundaryRefresh();
+  initOfflineSync();
+  initCloudSync();
 
   document.querySelector("#saveReviewBtn").addEventListener("click", saveTodayReview);
   document.querySelector("#exportJsonBtn").addEventListener("click", downloadJsonBackup);

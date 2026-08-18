@@ -541,6 +541,7 @@ function renderTasks() {
   if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   if (typeof renderDailyCloseout === "function") renderDailyCloseout();
   if (typeof renderStudyProgressRunner === "function") renderStudyProgressRunner();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
   renderExecutionSurface();
   renderResultHandoff();
 }
@@ -577,6 +578,7 @@ function refreshDashboardForDateRollover() {
   if (typeof renderStudyTimeSummary === "function") renderStudyTimeSummary();
   if (typeof renderOutputRecords === "function") renderOutputRecords();
   if (typeof renderP1WeeklyStats === "function") renderP1WeeklyStats();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
   if (typeof renderHistory === "function") renderHistory();
   if (typeof renderRecentSevenDays === "function") renderRecentSevenDays();
   return true;

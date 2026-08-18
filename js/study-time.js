@@ -348,6 +348,7 @@ function refreshStudyTimeViews() {
   renderRecentSevenDays();
   renderHistory();
   if (typeof renderStudyProgressRunner === "function") renderStudyProgressRunner();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
 }
 
 function saveManualStudyTime() {

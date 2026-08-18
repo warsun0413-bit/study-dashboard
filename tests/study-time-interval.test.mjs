@@ -90,7 +90,7 @@ test("time interval UI and cache assets are current", () => {
   assert.ok(indexSource.indexOf("today-study-timeline-card") < indexSource.indexOf("execution-settings"));
   assert.match(indexSource, /id="todayPlanStudyTarget"/);
   assert.match(indexSource, /id="todayStudyTargetSource"/);
-  assert.match(indexSource, /study-time\.js\?v=target-truth-v133/);
-  assert.match(serviceWorkerSource, /study-dashboard-safe-date-rollover-v153/);
-  assert.match(serviceWorkerSource, /study-time\.js\?v=target-truth-v133/);
+  assert.match(indexSource, /study-time\.js\?v=weekly-improvement-v154/);
+  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
+  assert.match(serviceWorkerSource, /study-time\.js\?v=weekly-improvement-v154/);
 });

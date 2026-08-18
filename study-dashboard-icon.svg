@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="学习面板">
+  <rect width="512" height="512" rx="112" fill="#315c4c"/>
+  <path d="M128 130h256v252H128z" fill="#fff" opacity=".96"/>
+  <path d="M170 188h172M170 246h172M170 304h108" fill="none" stroke="#315c4c" stroke-linecap="round" stroke-width="28"/>
+  <circle cx="342" cy="330" r="54" fill="#e6f0eb" stroke="#315c4c" stroke-width="18"/>
+  <path d="m318 330 17 17 34-38" fill="none" stroke="#315c4c" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+</svg>

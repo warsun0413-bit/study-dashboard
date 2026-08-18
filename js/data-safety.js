@@ -13,9 +13,10 @@ function downloadFile(filename, content, type = "application/octet-stream") {
 
 function readAllLocalStorage() {
   const data = {};
+  const excludedDeviceConfigKeys = new Set(["studyCloudSyncConfig"]);
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
-    if (key !== null) data[key] = localStorage.getItem(key);
+    if (key !== null && !excludedDeviceConfigKeys.has(key)) data[key] = localStorage.getItem(key);
   }
   return data;
 }
@@ -255,6 +256,7 @@ function applyPlanImportPreview() {
   pendingPlanImport = null;
   document.querySelector("#planImportPreviewDialog").hidden = true;
   renderTasks();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
   renderRecentSevenDays();
   renderExamStatsConfig();
   renderExamStatsOverview();
@@ -323,9 +325,11 @@ function validateStorageValues(values) {
 
 function restoreStorageValues(values) {
   const entries = validateStorageValues(values);
+  const deviceLocalSyncKeys = new Set(["studySyncDevice", "studySyncOutbox", "studySyncMeta", "studyCloudSyncConfig"]);
+  const restorableEntries = entries.filter(([key]) => !deviceLocalSyncKeys.has(key));
   const currentSnapshot = readRawStorageSnapshot();
   const restoredSnapshot = { ...currentSnapshot };
-  entries.forEach(([key, value]) => { if (value !== null) restoredSnapshot[key] = value; });
+  restorableEntries.forEach(([key, value]) => { if (value !== null) restoredSnapshot[key] = value; });
   const migrated = migrateStorageSnapshot(restoredSnapshot, { source: "backup-restore", force: true, todayKey: getDateKey() });
   applyStorageSnapshotTransaction(migrated.values, "backup-restore", true);
   ensureDataSchema();
@@ -342,7 +346,7 @@ function restoreStorageValues(values) {
   renderProfessionalResults();
   renderDueReviews();
   if (typeof renderP0FinalHome === "function") renderP0FinalHome();
-  return entries.length;
+  return restorableEntries.length;
 }
 
 async function importJsonBackup(file) {

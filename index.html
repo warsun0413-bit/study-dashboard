@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#315c4c">
   <meta name="description" content="简洁的学习计划执行与学习记录面板">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="学习面板">
   <title>南开马理论考研任务面板</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=safe-date-rollover-v153">
+  <link rel="icon" href="study-dashboard-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=magic-link-v158">
 </head>
 <body>
   <header class="site-header">
@@ -16,6 +20,40 @@
       <h1>南开马理论考研任务面板</h1>
       <p id="todayDate" class="muted"></p>
     </div>
+    <aside class="offline-sync-card" aria-labelledby="offlineSyncStatus">
+      <strong id="offlineSyncStatus">正在检查离线记录</strong>
+      <small id="offlineSyncDetail">本阶段只建立本机待上传队列，不上传真实数据。</small>
+      <small>只接受 Supabase Publishable key；不会接收 Secret 或 service_role 密钥。</small>
+      <div class="offline-sync-actions">
+        <button id="protectOfflineStorageBtn" class="button secondary" type="button">保护本机记录</button>
+        <button id="installOfflineDashboardBtn" class="button ghost" type="button">安装到 iPad</button>
+        <button id="uploadOfflineSyncBtn" class="button ghost" type="button">连接云端</button>
+      </div>
+      <details id="cloudSyncSetup" class="cloud-sync-setup">
+        <summary>云端同步设置</summary>
+        <div class="cloud-sync-fields">
+          <label>Supabase 项目地址
+            <input id="cloudSyncProjectUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://项目代号.supabase.co">
+          </label>
+          <label>Publishable key
+            <input id="cloudSyncPublishableKey" type="password" autocomplete="off" spellcheck="false" placeholder="sb_publishable_...">
+          </label>
+          <label>登录邮箱
+            <input id="cloudSyncEmail" type="email" inputmode="email" autocomplete="email" placeholder="你的邮箱">
+          </label>
+          <p>使用 Supabase 默认 Magic Link：邮件链接返回本页后会自动登录。部署后需把本页 HTTPS 地址加入 Supabase 的 Redirect URLs。</p>
+          <div class="cloud-sync-buttons">
+            <button id="saveCloudSyncConfigBtn" class="button ghost" type="button">保存设备配置</button>
+            <button id="sendCloudSyncMagicLinkBtn" class="button secondary" type="button">发送登录链接</button>
+          </div>
+          <div class="cloud-sync-buttons">
+            <button id="initializeCloudDeviceBtn" class="button secondary" type="button" hidden>从云端初始化本设备</button>
+            <button id="signOutCloudSyncBtn" class="button ghost" type="button" hidden>退出云端登录</button>
+          </div>
+        </div>
+      </details>
+      <span id="offlineSyncActionStatus" class="status" aria-live="polite"></span>
+    </aside>
   </header>
 
   <main class="dashboard">
@@ -273,6 +311,42 @@
       <p id="progressRunnerBaseline" class="muted progress-runner-baseline">尚无个人基线</p>
     </section>
 
+    <details id="weeklyImprovementPanel" class="panel home-order-4 low-frequency-panel weekly-improvement-panel">
+      <summary>
+        <span><span class="step">滚动7日提升</span><strong>最近7天提升诊断</strong></span>
+        <strong id="weeklyImprovementSummaryStatus" class="weekly-improvement-status">证据积累中</strong>
+      </summary>
+      <div class="weekly-improvement-body">
+        <p id="weeklyImprovementRange" class="muted"></p>
+        <p id="weeklyImprovementEvidence" class="weekly-improvement-evidence"></p>
+        <div id="weeklyImprovementMetrics" class="weekly-improvement-metrics" aria-live="polite"></div>
+        <section id="weeklyImprovementPreviousAction" class="weekly-improvement-previous" hidden>
+          <div><span>上次动作复核</span><strong id="weeklyImprovementPreviousStatus">暂不能判断</strong></div>
+          <p id="weeklyImprovementPreviousText"></p>
+        </section>
+        <section class="weekly-improvement-diagnosis" aria-labelledby="weeklyImprovementDiagnosisTitle">
+          <p class="step">本轮主瓶颈</p>
+          <h3 id="weeklyImprovementDiagnosisTitle">正在根据正式证据判断</h3>
+          <ul id="weeklyImprovementDiagnosisEvidence"></ul>
+        </section>
+        <section class="weekly-improvement-action" aria-labelledby="weeklyImprovementActionTitle">
+          <p class="step">一条主动作</p>
+          <h3 id="weeklyImprovementActionTitle">下一轮只纠正这一件事</h3>
+          <label>可修改具体措辞和执行量；瓶颈与证据保持锁定
+            <textarea id="weeklyImprovementAction" rows="3" maxlength="300"></textarea>
+          </label>
+          <strong>两条守则</strong>
+          <ul id="weeklyImprovementGuardrails"></ul>
+          <p id="weeklyImprovementBinding" class="muted"></p>
+          <div class="button-row">
+            <button id="confirmWeeklyImprovementBtn" class="button primary" type="button">确认并冻结本次周动作</button>
+            <button id="bindWeeklyImprovementBtn" class="button secondary" type="button" hidden>绑定到下一轮计划</button>
+            <span id="weeklyImprovementStatus" class="status" aria-live="polite"></span>
+          </div>
+        </section>
+      </div>
+    </details>
+
     <section id="dailyCloseout" class="panel home-order-4" aria-labelledby="reviewTitle">
       <p class="step">03 一键收工</p><h2 id="reviewTitle">用两句话完成今天的闭环</h2>
       <div id="focusOutputsReference" class="focus-output-reference" hidden>
@@ -336,6 +410,7 @@
           </div>
           <p id="aiRollingWeekRange" class="muted"></p>
           <p id="aiRollingWeekCalibration" class="ai-plan-calibration-note"></p>
+          <div id="aiRollingWeekConstraint" class="weekly-plan-constraint" hidden></div>
           <p class="muted">章节范围只取已导入阶段任务和已记录准确停点；生成后仅预览，需手动确认才会导入。</p>
           <div id="aiRollingWeekList" class="ai-tomorrow-plan-list"></div>
           <div class="button-row">
@@ -613,30 +688,37 @@
   <script src="js/execution-state-core.js?v=review-focus-loop-v142"></script>
   <script src="js/plan-window-core.js?v=next-task-order-v146"></script>
   <script src="js/ai-tomorrow-plan-core.js?v=english-split-v145"></script>
-  <script src="js/ai-rolling-week-plan-core.js?v=english-split-v145"></script>
+  <script src="js/ai-rolling-week-plan-core.js?v=weekly-improvement-v154"></script>
   <script src="js/admission-readiness-core.js?v=admission-joint-v114"></script>
   <script src="js/progress-runner-core.js?v=execution-target-v126"></script>
   <script src="js/p0-final-core.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-results-core.js?v=reading-notes-v116"></script>
   <script src="js/p1-output-core.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration-core.js?v=schedule-transition-v149"></script>
-  <script src="js/storage.js?v=admission-joint-v114"></script>
+  <script src="js/weekly-improvement-core.js?v=weekly-improvement-v154"></script>
+  <script src="js/offline-sync-core.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync-core.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync-transport.js?v=magic-link-v158"></script>
+  <script src="js/storage.js?v=offline-sync-v155"></script>
   <script src="js/p0-results.js?v=safe-date-rollover-v153"></script>
-  <script src="js/migrations.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/migrations.js?v=magic-link-v158"></script>
   <script src="js/ui.js?v=ai-plan-calibration-v92"></script>
   <script src="js/focus-timer-core.js?v=review-recovery-v143"></script>
-  <script src="js/tasks.js?v=safe-date-rollover-v153"></script>
-  <script src="js/study-time.js?v=target-truth-v133"></script>
+  <script src="js/tasks.js?v=weekly-improvement-v154"></script>
+  <script src="js/study-time.js?v=weekly-improvement-v154"></script>
   <script src="js/exam-stats.js?v=ai-plan-calibration-v92"></script>
   <script src="js/admission-readiness.js?v=admission-joint-v114"></script>
-  <script src="js/review.js?v=focus-result-handoff-v140"></script>
+  <script src="js/review.js?v=weekly-improvement-v154"></script>
   <script src="js/nankai-control-plan-2026-08-06.js?v=control-plan-import-v105"></script>
-  <script src="js/data-safety.js?v=admission-joint-v114"></script>
+  <script src="js/data-safety.js?v=magic-link-v158"></script>
   <script src="js/p1-results.js?v=reading-notes-v116"></script>
   <script src="js/p1-output.js?v=ai-plan-calibration-v92"></script>
   <script src="js/p1-integration.js?v=ai-plan-calibration-v92"></script>
+  <script src="js/weekly-improvement.js?v=weekly-improvement-v154"></script>
   <script src="js/progress-runner.js?v=execution-target-v126"></script>
   <script src="js/p0-final.js?v=next-task-reveal-v147"></script>
-  <script src="js/app.js?v=safe-date-rollover-v153"></script>
+  <script src="js/offline-sync.js?v=magic-link-v158"></script>
+  <script src="js/cloud-sync.js?v=magic-link-v158"></script>
+  <script src="js/app.js?v=magic-link-v158"></script>
 </body>
 </html>

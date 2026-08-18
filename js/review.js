@@ -494,6 +494,10 @@ function buildAiRollingWeekPlanData() {
       ? normalizeReviewQueueRecords(readJson(reviewQueueKey, [])) : readJson(reviewQueueKey, []),
     history,
   });
+  const improvementConstraint = typeof resolveWeeklyImprovementConstraint === "function"
+    ? resolveWeeklyImprovementConstraint(readJson(weeklyImprovementRecordsKey, []), { startDate: context.startDate, endDate: context.endDate })
+    : null;
+  context.improvementConstraint = improvementConstraint;
   return {
     context,
     plansJson: JSON.stringify(readDailyPlans()),
@@ -503,6 +507,7 @@ function buildAiRollingWeekPlanData() {
       endDate: context.endDate,
       sourcePlan: context.sourcePlan,
       capacityCalibration: context.capacityCalibration,
+      improvementConstraint,
       recentAiPlanExecution: buildRecentAiPlanExecution(history, 3),
       days: context.days.map((day) => ({
         date: day.date,
@@ -520,15 +525,35 @@ function buildAiRollingWeekPlanData() {
   };
 }
 
+function renderAiRollingWeekImprovementConstraint(container, improvementConstraint) {
+  container.replaceChildren();
+  container.hidden = !improvementConstraint;
+  if (!improvementConstraint) return;
+  const heading = document.createElement("strong");
+  const action = document.createElement("p");
+  const guardrails = document.createElement("ul");
+  heading.textContent = `本轮执行约束 · ${improvementConstraint.diagnosisLabel}`;
+  action.textContent = improvementConstraint.primaryAction;
+  (Array.isArray(improvementConstraint.guardrails) ? improvementConstraint.guardrails : []).forEach((guardrail) => {
+    const item = document.createElement("li");
+    item.textContent = guardrail.text;
+    guardrails.appendChild(item);
+  });
+  container.append(heading, action, guardrails);
+}
+
 function renderAiRollingWeekPlanPreview() {
   const card = document.querySelector("#aiRollingWeekPlan");
   const range = document.querySelector("#aiRollingWeekRange");
   const list = document.querySelector("#aiRollingWeekList");
   const calibration = document.querySelector("#aiRollingWeekCalibration");
+  const constraint = document.querySelector("#aiRollingWeekConstraint");
   const applyButton = document.querySelector("#applyAiRollingWeekBtn");
-  if (!card || !range || !list || !calibration || !applyButton) return;
+  if (!card || !range || !list || !calibration || !constraint || !applyButton) return;
   card.hidden = !getTodayAiReviewRecord();
   list.replaceChildren();
+  constraint.replaceChildren();
+  constraint.hidden = true;
   applyButton.hidden = true;
   if (!pendingAiRollingWeekPlan) {
     const imported = readJson(importedPlanKey, {});
@@ -537,16 +562,19 @@ function renderAiRollingWeekPlanPreview() {
       ? `当前逐日计划至 ${end}。生成下一轮计划后先预览，不会自动写入。`
       : "请先导入总控计划。";
     calibration.textContent = "生成时会用近7日真实学习时长和正式任务完成数校准强度；少于3个有效日时不判断速度。";
+    renderAiRollingWeekImprovementConstraint(constraint, imported.improvementConstraint || null);
     return;
   }
   const { plan, preview, applied } = pendingAiRollingWeekPlan;
   const capacity = pendingAiRollingWeekPlan.context.capacityCalibration;
+  const improvementConstraint = pendingAiRollingWeekPlan.context.improvementConstraint;
   range.textContent = `${plan.startDate}—${plan.endDate} · ${plan.summary || "按阶段任务与真实停点续接"}`;
   const completionText = Number.isFinite(capacity.weightedCompletionRate) ? `，正式任务加权完成率${capacity.weightedCompletionRate}%` : "";
   const evidenceAuditText = `采用${capacity.evidenceDays}日 · 排除${Math.max(0, Number(capacity.excludedDays) || 0)}日`;
   calibration.textContent = capacity.status === "calibrated"
     ? `强度依据：近7日${evidenceAuditText}，中位有效学习${capacity.medianStudyMinutes}分钟${completionText}；每日计划不超过${capacity.recommendedMaxMinutes}分钟。时长与完成数不代表掌握程度。`
     : `${capacity.message} 时长与完成数只用于执行强度，不代表掌握程度。`;
+  renderAiRollingWeekImprovementConstraint(constraint, improvementConstraint);
   plan.days.forEach((day) => {
     const section = document.createElement("section");
     section.className = "ai-rolling-week-day";
@@ -602,7 +630,10 @@ async function requestAiRollingWeekPlan() {
     if (!response.ok || result.ok !== true) throw new Error(String(result.error || `DeepSeek 请求失败（${response.status}）`).slice(0, 300));
     const plan = normalizeAiRollingWeekPlan(result.plan, requestContext.context);
     const generatedAt = new Date().toISOString();
-    const preview = mergeAiRollingWeekPlan(readDailyPlans(), plan, requestContext.context, { generatedAt });
+    const preview = mergeAiRollingWeekPlan(readDailyPlans(), plan, requestContext.context, {
+      generatedAt,
+      improvementConstraint: requestContext.context.improvementConstraint,
+    });
     pendingAiRollingWeekPlan = {
       plan,
       context: requestContext.context,
@@ -633,6 +664,7 @@ function applyAiRollingWeekPlan() {
   const plan = normalizeAiRollingWeekPlan(pendingAiRollingWeekPlan.plan, pendingAiRollingWeekPlan.context);
   const preview = mergeAiRollingWeekPlan(currentPlans, plan, pendingAiRollingWeekPlan.context, {
     generatedAt: pendingAiRollingWeekPlan.generatedAt,
+    improvementConstraint: pendingAiRollingWeekPlan.context.improvementConstraint,
   });
   const snapshot = readRawStorageSnapshot();
   applyStorageSnapshotTransaction({
@@ -647,6 +679,7 @@ function applyAiRollingWeekPlan() {
   renderRecentSevenDays();
   renderAiTomorrowPlanPreview();
   renderAiRollingWeekPlanPreview();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
   setStatus("#aiRollingWeekStatus", `已导入 ${plan.startDate} 至 ${plan.endDate}；${preview.protectedTasks.length} 个受保护任务保持原样。`);
   return true;
 }
@@ -1095,6 +1128,7 @@ function saveTodayReview() {
   renderExamStatsOverview();
   if (typeof renderP0FinalHome === "function") renderP0FinalHome();
   renderDailyCloseout();
+  if (typeof renderWeeklyImprovement === "function") renderWeeklyImprovement();
   setStatus("#reviewSaveStatus", "今日学习记录已更新；同一天不会重复生成记录。");
   return true;
 }

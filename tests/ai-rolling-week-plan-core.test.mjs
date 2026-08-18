@@ -295,6 +295,29 @@ test("merges seven days while preserving protected and custom tasks", () => {
   assert.deepEqual(plain(merged.metadata.detailedPlanDates), plain(source.days.map((day) => day.date)));
 });
 
+test("weekly improvement constraint is frozen in metadata without changing task content or time", () => {
+  const source = makeContext();
+  const plan = core.normalizeAiRollingWeekPlan(makeRawPlan(source), source);
+  const baseline = core.mergeAiRollingWeekPlan({}, plan, source, { generatedAt: "2026-08-08T10:00:00.000Z" });
+  const improvementConstraint = {
+    schemaVersion: 1,
+    recordId: "weekly-improvement-2026-08-08",
+    sourceRange: { start: "2026-08-02", end: "2026-08-08" },
+    targetRange: { startDate: source.startDate, endDate: source.endDate },
+    evidenceFingerprint: "weekly-evidence-v1-demo",
+    diagnosisId: "review-recovery",
+    diagnosisLabel: "到期复盘没有及时闭环",
+    primaryAction: "每天在复盘预算内完成到期D1",
+    guardrails: [{ id: "english-anchor", text: "保持英语固定锚点" }, { id: "closed-book-product", text: "保持闭卷产物" }],
+  };
+  const constrained = core.mergeAiRollingWeekPlan({}, plan, source, {
+    generatedAt: "2026-08-08T10:00:00.000Z",
+    improvementConstraint,
+  });
+  assert.deepEqual(plain(constrained.metadata.improvementConstraint), improvementConstraint);
+  assert.deepEqual(plain(constrained.dailyPlans), plain(baseline.dailyPlans));
+});
+
 test("confirmed rolling metadata is trusted only for its exact dates", () => {
   const source = makeContext();
   const plan = core.normalizeAiRollingWeekPlan(makeRawPlan(source), source);
@@ -313,6 +336,6 @@ test("page and cache expose the manual-confirm rolling workflow", () => {
   assert.match(index, /id="aiRollingWeekCalibration"/);
   assert.match(review, /fetch\("\/api\/ai-week-plan"/);
   assert.match(review, /ai-rolling-week-import-v1/);
-  assert.match(worker, /study-dashboard-safe-date-rollover-v153/);
-  assert.match(worker, /ai-rolling-week-plan-core\.js\?v=english-split-v145/);
+  assert.match(worker, /study-dashboard-magic-link-v158/);
+  assert.match(worker, /ai-rolling-week-plan-core\.js\?v=weekly-improvement-v154/);
 });

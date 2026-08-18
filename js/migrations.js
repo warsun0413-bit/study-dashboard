@@ -65,9 +65,10 @@ function isStoredObject(value) {
 
 function readRawStorageSnapshot() {
   const snapshot = {};
+  const excludedDeviceConfigKeys = new Set(["studyCloudSyncConfig"]);
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
-    if (key !== null && key !== MIGRATION_ROLLBACK_KEY) snapshot[key] = localStorage.getItem(key);
+    if (key !== null && key !== MIGRATION_ROLLBACK_KEY && !excludedDeviceConfigKeys.has(key)) snapshot[key] = localStorage.getItem(key);
   }
   return snapshot;
 }
@@ -332,6 +333,7 @@ function applyStorageSnapshotTransaction(targetSnapshot, operationId, downloadBa
       else localStorage.setItem(change.key, change.afterValue);
       applied.push(change);
     });
+    if (typeof captureOfflineSyncTransaction === "function") captureOfflineSyncTransaction(changes);
     return { changedKeys: changes.length, status: "completed" };
   } catch (error) {
     [...applied].reverse().forEach((change) => {

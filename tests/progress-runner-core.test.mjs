@@ -155,7 +155,7 @@ test("runner assets are loaded in the page and current cache", () => {
   assert.match(indexSource, /正式任务（等效完成）/);
   assert.match(indexSource, /progress-runner-core\.js\?v=execution-target-v126/);
   assert.match(indexSource, /progress-runner\.js\?v=execution-target-v126/);
-  assert.match(serviceWorkerSource, /study-dashboard-safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
   assert.match(serviceWorkerSource, /progress-runner-core\.js\?v=execution-target-v126/);
 });
 

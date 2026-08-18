@@ -501,6 +501,8 @@ function normalizeAiRollingWeekPlan(rawPlan, context) {
 
 function mergeAiRollingWeekPlan(existingPlans, normalizedPlan, context, options = {}) {
   const generatedAt = String(options.generatedAt || new Date().toISOString());
+  const improvementConstraint = options.improvementConstraint && typeof options.improvementConstraint === "object"
+    ? JSON.parse(JSON.stringify(options.improvementConstraint)) : null;
   const planId = `rolling-week-${normalizedPlan.startDate}`;
   const sourceDocumentTitle = `AI滚动7日计划 ${normalizedPlan.startDate}—${normalizedPlan.endDate}`;
   const nextPlans = { ...(existingPlans && typeof existingPlans === "object" ? existingPlans : {}) };
@@ -556,6 +558,7 @@ function mergeAiRollingWeekPlan(existingPlans, normalizedPlan, context, options 
       generatedAt,
       parentPlanType: context.sourcePlan.planType,
       parentPlanId: context.sourcePlan.planId,
+      ...(improvementConstraint ? { improvementConstraint } : {}),
     },
   };
 }

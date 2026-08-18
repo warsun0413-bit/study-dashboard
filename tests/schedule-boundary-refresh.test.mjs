@@ -124,11 +124,11 @@ test("review gate refresh updates controls in place without erasing evidence", (
 });
 
 test("schedule refresh assets share one cache contract", () => {
-  assert.match(indexSource, /js\/app\.js\?v=safe-date-rollover-v153/);
-  assert.match(indexSource, /js\/tasks\.js\?v=safe-date-rollover-v153/);
+  assert.match(indexSource, /js\/app\.js\?v=magic-link-v158/);
+  assert.match(indexSource, /js\/tasks\.js\?v=weekly-improvement-v154/);
   assert.match(indexSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
-  assert.match(serviceWorkerSource, /study-dashboard-safe-date-rollover-v153/);
-  assert.match(serviceWorkerSource, /js\/app\.js\?v=safe-date-rollover-v153/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=safe-date-rollover-v153/);
+  assert.match(serviceWorkerSource, /study-dashboard-magic-link-v158/);
+  assert.match(serviceWorkerSource, /js\/app\.js\?v=magic-link-v158/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=weekly-improvement-v154/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=safe-date-rollover-v153/);
 });

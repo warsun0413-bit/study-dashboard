@@ -36,6 +36,7 @@ const migrationReportsKey = "studyMigrationReports";
 const migrationRollbackKey = "studyMigrationRollback";
 const errorLogKey = "studyErrorLog";
 const uiPreferencesKey = "studyUiPreferences";
+const weeklyImprovementRecordsKey = "studyWeeklyImprovementRecords";
 const autoSaveFields = Array.from(document.querySelectorAll("[data-save]"));
 
 function getDateKey(date = new Date()) {
@@ -58,8 +59,13 @@ function readJson(key, fallback) {
   }
 }
 
-function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+function writeJson(key, value, options = {}) {
+  const beforeValue = localStorage.getItem(key);
+  const afterValue = JSON.stringify(value);
+  localStorage.setItem(key, afterValue);
+  if (options.skipSyncCapture !== true && typeof captureOfflineSyncWrite === "function") {
+    captureOfflineSyncWrite(key, beforeValue, afterValue);
+  }
 }
 
 function ensureDataSchema() {
