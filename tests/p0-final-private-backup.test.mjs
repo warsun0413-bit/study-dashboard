@@ -56,7 +56,11 @@ test("real backup completes the P0 final migration, snapshot, restore, and norma
   assert.equal(Object.keys(plans).length, 10);
   assert.equal(Object.keys(plans).filter((date) => date >= "2026-07-18").length, 7);
   assert.equal(templates.length, 10);
-  assert.deepEqual(plans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
+  const migratedTodayTasks = plans["2026-07-18"].tasks;
+  const addedWords = migratedTodayTasks.find((task) => task.id === "plan-english-words");
+  assert.equal(addedWords.time, "08:00—08:25");
+  assert.equal(addedWords.status, "not-started");
+  assert.deepEqual(migratedTodayTasks.filter((task) => task.id !== "plan-english-words").map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
   assert.equal(values.studyFocusSessions, originalSessionsRaw);
   assert.equal(JSON.parse(values.studyFocusSessions).length, 12);
   assert.equal(originalSessions.filter((session) => Number(session && session.seconds) <= 0).length, 1);

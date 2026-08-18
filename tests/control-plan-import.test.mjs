@@ -42,10 +42,19 @@ test("safe preview imports future detail and protects manual or executed local t
   assert.equal(local.sourceSchemaVersion, 3);
   assert.equal(local.sourcePlanId, "nankai-control-2026-08-06");
   assert.deepEqual(Object.fromEntries(local.tasks.map((task) => [task.sourceTaskKey, task.time])), {
+    englishWords: "08:00—08:25",
     english: "15:45—17:15", "722": "08:35—10:35", "844": "10:50—12:20",
     originalTextOrReview: "20:40—21:00", training: "17:30—18:30",
     politics: "14:00—15:30", outputOrMock: "19:00—20:30",
   });
+  const localWords = local.tasks.find((task) => task.sourceTaskKey === "englishWords");
+  const localEnglish = local.tasks.find((task) => task.sourceTaskKey === "english");
+  assert.equal(localWords.name, "英语单词");
+  assert.equal(localWords.description.includes("[object Object]"), false);
+  assert.equal(localWords.resultTrackingVersion, undefined);
+  assert.equal(localEnglish.name, "英语阅读");
+  assert.equal(localEnglish.resultTrackingVersion, 1);
+  assert.equal(localEnglish.subtasks.map((task) => task.subtaskId).join(","), "reading");
   const local722 = local.tasks.find((task) => task.sourceTaskKey === "722");
   local722.manualEdited = true;
   local722.description = "我的722手动安排";
@@ -70,16 +79,16 @@ test("the August 12 acceptance day remains recoverable as an exact phase templat
 test("built-in import is visible, wired through preview, and cached", () => {
   assert.match(indexSource, /id="importControlPlanBtn"/);
   assert.match(indexSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
-  assert.match(indexSource, /plan-window-core\.js\?v=time-window-first-v134/);
+  assert.match(indexSource, /plan-window-core\.js\?v=english-split-v145/);
   assert.match(indexSource, /data-safety\.js\?v=admission-joint-v114/);
   assert.match(indexSource, /app\.js\?v=admission-joint-v114/);
   assert.match(appSource, /importControlPlanBtn[\s\S]*importBuiltInNankaiControlPlan/);
   assert.match(safetySource, /importNankaiPlan\(NANKAI_CONTROL_PLAN_20260806\)/);
   assert.match(safetySource, /\n\s+detailedPlanDates,/);
   assert.match(safetySource, /typeof renderAiTomorrowPlanPreview === "function"/);
-  assert.match(serviceWorkerSource, /study-dashboard-review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
   assert.match(serviceWorkerSource, /data-safety\.js\?v=admission-joint-v114/);
   assert.match(serviceWorkerSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
-  assert.match(serviceWorkerSource, /plan-window-core\.js\?v=time-window-first-v134/);
-  assert.match(serviceWorkerSource, /tasks\.js\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /plan-window-core\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /tasks\.js\?v=english-split-v145/);
 });

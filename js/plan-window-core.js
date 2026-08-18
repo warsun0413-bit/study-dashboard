@@ -4,13 +4,14 @@ const PLAN_WINDOW_MIGRATION_ID = "p0-plan-window-v1";
 const PLAN_WINDOW_DAYS = 7;
 const PLAN_IMPORT_DECISIONS = ["keep-local", "use-import", "fill-empty", "skip"];
 const PLAN_WINDOW_TASK_DEFINITIONS = [
-  { taskId: "plan-english", sourceTaskKey: "english", subject: "英语", time: "15:45—17:15", name: "英语", counted: true, category: "english" },
+  { taskId: "plan-english-words", sourceTaskKey: "englishWords", subject: "英语词汇", time: "08:00—08:25", name: "英语单词", counted: true, category: "englishWords", defaultDescription: "滚动复习昨日阅读错词、熟词僻义和重要搭配", defaultCompletionCriteria: "滚动复习并留下易错词复测记录。" },
   { taskId: "plan-722", sourceTaskKey: "722", subject: "722马原", time: "08:35—10:35", name: "722", counted: true, category: "maYuan" },
   { taskId: "plan-844", sourceTaskKey: "844", subject: "844马发史", time: "10:50—12:20", name: "844", counted: true, category: "maHistory" },
-  { taskId: "plan-original-review", sourceTaskKey: "originalTextOrReview", subject: "综合复盘", time: "20:40—21:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
-  { taskId: "plan-training", sourceTaskKey: "training", subject: "训练", time: "17:30—18:30", name: "训练", exercise: true, category: "exercise" },
   { taskId: "plan-politics", sourceTaskKey: "politics", subject: "公共政治", time: "14:00—15:30", name: "政治", counted: true, category: "politics" },
+  { taskId: "plan-english", sourceTaskKey: "english", subject: "英语", time: "15:45—17:15", name: "英语阅读", counted: true, category: "english" },
+  { taskId: "plan-training", sourceTaskKey: "training", subject: "训练", time: "17:30—18:30", name: "训练", exercise: true, category: "exercise" },
   { taskId: "plan-output", sourceTaskKey: "outputOrMock", subject: "专业课输出", time: "19:00—20:30", name: "输出", counted: true, category: "output" },
+  { taskId: "plan-original-review", sourceTaskKey: "originalTextOrReview", subject: "综合复盘", time: "20:40—21:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
 ];
 
 function planClockMinutes(value) {
@@ -331,7 +332,8 @@ function getTaskStatusForPlan(task) {
 }
 
 function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
-  const description = String(sourceTask && sourceTask.description || sourceTask || "").trim();
+  const sourceDescription = isPlanObject(sourceTask) ? sourceTask.description : sourceTask;
+  const description = String(sourceDescription || definition.defaultDescription || "").trim();
   const status = defaultStatus === "已完成" ? "completed" : defaultStatus === "进行中" ? "in-progress" : "not-started";
   const p1Metadata = {};
   ["englishSubtasks", "politicsTarget", "outputType", "nextStart", "dueReviews", "originalPlan", "adjustedPlan"].forEach((key) => {
@@ -345,7 +347,7 @@ function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
     time: definition.time,
     name: definition.name,
     description,
-    completionCriteria: String(sourceTask && (sourceTask.completionCriteria || sourceTask.minimumOutput) || "").trim(),
+    completionCriteria: String(sourceTask && (sourceTask.completionCriteria || sourceTask.minimumOutput) || definition.defaultCompletionCriteria || "").trim(),
     status,
     manualEdited: false,
     actualResultRefs: [],
@@ -363,7 +365,7 @@ function createPlanTask(definition, sourceTask, defaultStatus = "未开始") {
 
 function getCompletionCriteriaFromSchedule(fixedSchedule, definition) {
   const moduleNames = {
-    english: ["英语词汇", "英语"], "722": ["722"], "844": ["844"], originalTextOrReview: ["原著/D复盘"],
+    englishWords: ["英语词汇"], english: ["英语"], "722": ["722"], "844": ["844"], originalTextOrReview: ["原著/D复盘"],
     training: ["训练"], politics: ["政治"], outputOrMock: ["输出"],
   }[definition.sourceTaskKey] || [];
   return (Array.isArray(fixedSchedule) ? fixedSchedule : [])
@@ -604,32 +606,48 @@ function materializeDayFromPhaseTemplate(dateKey, phase) {
 
 function enrichDetailedPlanDay(dateKey, day) {
   if (!day || !Array.isArray(day.tasks)) return day;
+  const hasEnglishWords = day.tasks.some((task) => task && (
+    task.sourceTaskKey === "englishWords"
+    || task.category === "englishWords"
+    || ["plan-english-words", "english-words", "sunday-words"].includes(String(task.taskId || task.id || ""))
+  ));
+  const tasks = day.tasks.map((task) => {
+    const definition = PLAN_WINDOW_TASK_DEFINITIONS.find((item) => (
+      item.taskId === (task && (task.taskId || task.id))
+      || item.sourceTaskKey === (task && task.sourceTaskKey)
+    ));
+    const taskId = String(task && (task.taskId || task.id) || "");
+    const refs = Array.isArray(task && task.actualResultRefs)
+      ? task.actualResultRefs
+      : task && task.actualResultRef ? [task.actualResultRef]
+        : Array.isArray(task && task.resultRefs) ? task.resultRefs : [];
+    return {
+      ...task,
+      date: task && task.date || dateKey,
+      taskId,
+      time: definition && task && task.aiPlanned !== true ? definition.time : String(task && task.time || definition && definition.time || ""),
+      sourceTaskKey: String(task && task.sourceTaskKey || definition && definition.sourceTaskKey || ""),
+      subject: String(task && task.subject || definition && definition.subject || ""),
+      completionCriteria: String(task && (task.completionCriteria || task.minimum) || ""),
+      status: getTaskStatusForPlan(task),
+      manualEdited: task && task.manualEdited === true,
+      actualResultRefs: refs,
+    };
+  });
+  if (!hasEnglishWords) {
+    const definition = PLAN_WINDOW_TASK_DEFINITIONS.find((item) => item.sourceTaskKey === "englishWords");
+    const vocabularyTask = createPlanTask(definition, {});
+    vocabularyTask.date = dateKey;
+    const insertAt = tasks.findIndex((task) => {
+      const range = getPlanTaskTimeRange(task);
+      return range && range.start > 8 * 60;
+    });
+    tasks.splice(insertAt >= 0 ? insertAt : 0, 0, vocabularyTask);
+  }
   return {
     ...day,
     date: day.date || dateKey,
-    tasks: day.tasks.map((task) => {
-      const definition = PLAN_WINDOW_TASK_DEFINITIONS.find((item) => (
-        item.taskId === (task && (task.taskId || task.id))
-        || item.sourceTaskKey === (task && task.sourceTaskKey)
-      ));
-      const taskId = String(task && (task.taskId || task.id) || "");
-      const refs = Array.isArray(task && task.actualResultRefs)
-        ? task.actualResultRefs
-        : task && task.actualResultRef ? [task.actualResultRef]
-          : Array.isArray(task && task.resultRefs) ? task.resultRefs : [];
-      return {
-        ...task,
-        date: task && task.date || dateKey,
-        taskId,
-        time: definition && task && task.aiPlanned !== true ? definition.time : String(task && task.time || definition && definition.time || ""),
-        sourceTaskKey: String(task && task.sourceTaskKey || definition && definition.sourceTaskKey || ""),
-        subject: String(task && task.subject || definition && definition.subject || ""),
-        completionCriteria: String(task && (task.completionCriteria || task.minimum) || ""),
-        status: getTaskStatusForPlan(task),
-        manualEdited: task && task.manualEdited === true,
-        actualResultRefs: refs,
-      };
-    }),
+    tasks,
   };
 }
 

@@ -45,7 +45,11 @@ test("real P0 backup migrates to P1 with empty result stores and all trusted inv
   const plans = JSON.parse(first.values.studyDailyPlans);
   assert.equal(Object.keys(plans).filter((date) => date >= "2026-07-18").length, 7);
   assert.equal(JSON.parse(first.values.studyPlanPhaseTemplates).length, 10);
-  assert.deepEqual(plans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
+  const migratedTodayTasks = plans["2026-07-18"].tasks;
+  const addedWords = migratedTodayTasks.find((task) => task.id === "plan-english-words");
+  assert.equal(addedWords.time, "08:00—08:25");
+  assert.equal(addedWords.status, "not-started");
+  assert.deepEqual(migratedTodayTasks.filter((task) => task.id !== "plan-english-words").map((task) => [task.id, task.status, task.completed]), originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.status, task.completed]));
   const oldEnglish = originalPlans["2026-07-18"].tasks.find((task) => task.id === "plan-english");
   assert.equal(oldEnglish.status, "completed");
   assert.equal(JSON.parse(first.values.studyEnglishWordRecords).length + JSON.parse(first.values.studyEnglishReadingRecords).length, 0);

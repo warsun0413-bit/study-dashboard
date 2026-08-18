@@ -4,8 +4,9 @@ const AI_ROLLING_STANDARD_MINUTES = 435;
 const AI_ROLLING_FLOOR_MINUTES = 300;
 const AI_ROLLING_STAGE_CEILING_MINUTES = 525;
 const AI_ROLLING_EXPANSION_COMPLETION_RATE = 80;
-const AI_ROLLING_REQUIRED_TASK_KEYS = ["english", "722", "844", "originalTextOrReview", "politics", "outputOrMock"];
+const AI_ROLLING_REQUIRED_TASK_KEYS = ["englishWords", "english", "722", "844", "originalTextOrReview", "politics", "outputOrMock"];
 const AI_ROLLING_STANDARD_TIMES = Object.freeze({
+  englishWords: "08:00—08:25",
   english: "15:45—17:15",
   mainProfessional: "08:35—10:25",
   retrievalProfessional: "10:40—11:30",
@@ -271,6 +272,7 @@ function buildRollingWeekSchedule(roles, maxPlannedMinutes) {
       profileId: "standard",
       plannedCoreMinutes: AI_ROLLING_STANDARD_MINUTES,
       times: {
+        englishWords: AI_ROLLING_STANDARD_TIMES.englishWords,
         english: AI_ROLLING_STANDARD_TIMES.english,
         [roles.mainSubject]: AI_ROLLING_STANDARD_TIMES.mainProfessional,
         [roles.secondarySubject]: AI_ROLLING_STANDARD_TIMES.retrievalProfessional,
@@ -309,6 +311,7 @@ function buildRollingWeekSchedule(roles, maxPlannedMinutes) {
     profileId: plannedCoreMinutes >= AI_ROLLING_FLOOR_MINUTES ? "floor" : "evidence-reduced",
     plannedCoreMinutes,
     times: {
+      englishWords: formatRollingWeekTime(8 * 60, vocabularyMinutes),
       [roles.mainSubject]: formatRollingWeekTime(8 * 60 + 35, durations[roles.mainSubject]),
       [roles.secondarySubject]: formatRollingWeekTime(8 * 60 + 35 + durations[roles.mainSubject] + 15, durations[roles.secondarySubject]),
       politics: formatRollingWeekTime(14 * 60, durations.politics),

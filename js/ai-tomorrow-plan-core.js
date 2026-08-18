@@ -1,5 +1,5 @@
 const AI_TOMORROW_PLAN_SOURCE_KEYS = [
-  "english", "722", "844", "originalTextOrReview", "training", "politics", "outputOrMock",
+  "englishWords", "english", "722", "844", "originalTextOrReview", "training", "politics", "outputOrMock",
 ];
 
 const AI_TRUSTED_PLAN_SOURCES = Object.freeze({
@@ -35,7 +35,8 @@ function getAiPlanTaskSourceKey(task) {
   const explicit = String(task && task.sourceTaskKey || "").trim();
   if (AI_TOMORROW_PLAN_SOURCE_KEYS.includes(explicit)) return explicit;
   const category = String(task && task.category || "");
-  if (["english", "englishWords", "englishReading"].includes(category)) return "english";
+  if (category === "englishWords") return "englishWords";
+  if (["english", "englishReading"].includes(category)) return "english";
   if (category === "maYuan") return "722";
   if (category === "maHistory") return "844";
   if (category === "rollingReview") return "originalTextOrReview";

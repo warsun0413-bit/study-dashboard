@@ -48,8 +48,12 @@ test("real backup migrates in memory with plan and focus invariants", () => {
   assert.equal(first.values.appDataSchemaVersion, "8.4");
   assert.equal(Object.keys(migratedPlans).length, 10);
   assert.equal(migratedPlans["2026-07-18"].currentTaskId, originalPlans["2026-07-18"].currentTaskId);
+  const migratedTodayTasks = migratedPlans["2026-07-18"].tasks;
+  const addedWords = migratedTodayTasks.find((task) => task.id === "plan-english-words");
+  assert.equal(addedWords.time, "08:00—08:25");
+  assert.equal(addedWords.status, "not-started");
   assert.deepEqual(
-    migratedPlans["2026-07-18"].tasks.map((task) => [task.id, task.description, task.status, task.completed]),
+    migratedTodayTasks.filter((task) => task.id !== "plan-english-words").map((task) => [task.id, task.description, task.status, task.completed]),
     originalPlans["2026-07-18"].tasks.map((task) => [task.id, task.description, task.status, task.completed]),
   );
   assert.ok(migratedPlans["2026-07-18"].tasks.every((task) => task.date === "2026-07-18" && task.taskId && Array.isArray(task.actualResultRefs)));

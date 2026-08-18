@@ -78,7 +78,7 @@ function makeContext(options = {}) {
 }
 
 function makeRawPlan(source) {
-  const times = ["08:00—09:00", "09:20—10:20", "10:40—11:40", "13:30—14:00", "14:20—15:20", "15:40—16:40", "19:00—20:00"];
+  const times = ["08:00—08:25", "08:35—09:35", "09:50—10:50", "11:10—11:40", "13:30—14:30", "15:45—16:45", "19:00—20:00", "20:20—20:50"];
   return {
     schemaVersion: 1,
     startDate: source.startDate,
@@ -106,12 +106,13 @@ test("builds the next contiguous seven days from imported detailed end", () => {
   assert.match(result.days[0].availableTasks.find((task) => task.sourceTaskKey === "844").description, /8月12日验收后的最新准确停点/);
   assert.equal(result.capacityCalibration.status, "insufficient-data");
   assert.equal(result.capacityCalibration.recommendedMaxMinutes, 435);
-  assert.deepEqual(plain(result.days[0].requiredTaskKeys), ["english", "722", "844", "originalTextOrReview", "politics", "outputOrMock"]);
+  assert.deepEqual(plain(result.days[0].requiredTaskKeys), ["englishWords", "english", "722", "844", "originalTextOrReview", "politics", "outputOrMock"]);
   assert.equal(result.days[0].loadProfile.mainSubject, "722");
   assert.equal(result.days[0].loadProfile.secondarySubject, "844");
   assert.equal(result.days[0].availableTasks.find((task) => task.sourceTaskKey === "722").time, "08:35—10:25");
   assert.equal(result.days[0].availableTasks.find((task) => task.sourceTaskKey === "844").time, "10:40—11:30");
   assert.equal(result.days[0].availableTasks.find((task) => task.sourceTaskKey === "english").time, "15:45—17:15");
+  assert.equal(result.days[0].availableTasks.find((task) => task.sourceTaskKey === "englishWords").time, "08:00—08:25");
 });
 
 test("uses the standard ceiling until three evidence days and gates later expansion", () => {
@@ -258,7 +259,7 @@ test("evidence below the five-hour floor compresses every core block without exc
     const match = task.time.match(/(\d{2}):(\d{2})—(\d{2}):(\d{2})/);
     return sum + (Number(match[3]) * 60 + Number(match[4]) - Number(match[1]) * 60 - Number(match[2]));
   }, 0);
-  assert.equal(representedMinutes, 155);
+  assert.equal(representedMinutes, 180);
   assert.ok(representedMinutes <= source.days[0].maxPlannedMinutes);
 });
 
@@ -279,11 +280,12 @@ test("merges seven days while preserving protected and custom tasks", () => {
   const source = makeContext();
   const plan = core.normalizeAiRollingWeekPlan(makeRawPlan(source), source);
   const existing = plain(source.days[0].baseDay);
-  existing.tasks[0].manualEdited = true;
-  existing.tasks[0].description = "我的人工英语任务";
+  const existingEnglish = existing.tasks.find((task) => task.sourceTaskKey === "english");
+  existingEnglish.manualEdited = true;
+  existingEnglish.description = "我的人工英语任务";
   existing.tasks.push({ id: "custom", name: "自定义任务", description: "保留我", manualEdited: true, status: "not-started" });
   const merged = core.mergeAiRollingWeekPlan({ [source.startDate]: existing }, plan, source, { generatedAt: "2026-08-08T10:00:00.000Z" });
-  assert.equal(merged.dailyPlans[source.startDate].tasks[0].description, "我的人工英语任务");
+  assert.equal(merged.dailyPlans[source.startDate].tasks.find((task) => task.sourceTaskKey === "english").description, "我的人工英语任务");
   assert.equal(merged.dailyPlans[source.startDate].tasks.at(-1).id, "custom");
   assert.equal(merged.protectedTasks.length, 1);
   assert.equal(merged.dailyPlans[source.startDate].targetEffectiveStudyHours, 7.25);
@@ -311,6 +313,6 @@ test("page and cache expose the manual-confirm rolling workflow", () => {
   assert.match(index, /id="aiRollingWeekCalibration"/);
   assert.match(review, /fetch\("\/api\/ai-week-plan"/);
   assert.match(review, /ai-rolling-week-import-v1/);
-  assert.match(worker, /study-dashboard-review-free-focus-v144/);
-  assert.match(worker, /ai-rolling-week-plan-core\.js\?v=capacity-evidence-v132/);
+  assert.match(worker, /study-dashboard-english-split-v145/);
+  assert.match(worker, /ai-rolling-week-plan-core\.js\?v=english-split-v145/);
 });

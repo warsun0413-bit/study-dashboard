@@ -17,13 +17,14 @@ const WEEKLY_OUTPUT_SUGGESTIONS = [
 ];
 
 const IMPORTED_PLAN_TASK_DEFINITIONS = [
-  { id: "plan-english", sourceKey: "english", time: "15:45—17:15", name: "英语", counted: true, category: "english" },
+  { id: "plan-english-words", sourceKey: "englishWords", time: "08:00—08:25", name: "英语单词", counted: true, category: "englishWords", defaultDescription: "滚动复习昨日阅读错词、熟词僻义和重要搭配" },
   { id: "plan-722", sourceKey: "722", time: "08:35—10:35", name: "722", counted: true, category: "maYuan" },
   { id: "plan-844", sourceKey: "844", time: "10:50—12:20", name: "844", counted: true, category: "maHistory" },
-  { id: "plan-original-review", sourceKey: "originalTextOrReview", time: "20:40—21:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
-  { id: "plan-training", sourceKey: "training", time: "17:30—18:30", name: "训练", exercise: true, category: "exercise" },
   { id: "plan-politics", sourceKey: "politics", time: "14:00—15:30", name: "政治", counted: true, category: "politics" },
+  { id: "plan-english", sourceKey: "english", time: "15:45—17:15", name: "英语阅读", counted: true, category: "english", resultTrackingVersion: 1, subtasks: [{ subtaskId: "reading", title: "英语阅读", required: true }] },
+  { id: "plan-training", sourceKey: "training", time: "17:30—18:30", name: "训练", exercise: true, category: "exercise" },
   { id: "plan-output", sourceKey: "outputOrMock", time: "19:00—20:30", name: "输出", counted: true, category: "output" },
+  { id: "plan-original-review", sourceKey: "originalTextOrReview", time: "20:40—21:00", name: "原著 / D复盘", counted: true, category: "rollingReview" },
 ];
 
 function makeTask(id, time, name, description, options = {}) {
@@ -138,19 +139,15 @@ function rollCurrentDetailedPlanWindow() {
 function createInitialTodayPlan(date = new Date()) {
   const isSunday = date.getDay() === 0;
   const tasks = isSunday ? createSundayTasks() : createWeekdayTasks(date);
-  const englishIndexes = tasks.map((task, index) => [task, index])
-    .filter(([task]) => ["englishWords", "englishReading"].includes(task.category));
-  if (englishIndexes.length === 2) {
-    const readingIndex = englishIndexes.find(([task]) => task.category === "englishReading")[1];
-    const insertAt = tasks.slice(0, readingIndex).filter((task) => !["englishWords", "englishReading"].includes(task.category)).length;
-    const englishMain = makeTask(isSunday ? "sunday-english-main" : "english-main", "15:45—17:15", "英语", "08:00—08:25完成词汇滚动复习；15:45—17:15完成真题阅读、证据定位和选项分析", {
+  const readingIndex = tasks.findIndex((task) => task.category === "englishReading");
+  if (readingIndex >= 0) {
+    const englishMain = makeTask(isSunday ? "sunday-english-main" : "english-main", "15:45—17:15", "英语阅读", "完成真题阅读、证据定位和选项分析", {
       counted: true,
       category: "english",
       resultTrackingVersion: 1,
       subtasks: [{ subtaskId: "reading", title: "英语阅读", required: true }],
     });
-    englishIndexes.slice().sort((left, right) => right[1] - left[1]).forEach(([, index]) => tasks.splice(index, 1));
-    tasks.splice(insertAt, 0, englishMain);
+    tasks.splice(readingIndex, 1, englishMain);
   }
   return { template: isSunday ? "sunday" : "weekday", tasks, currentTaskId: "" };
 }
@@ -160,7 +157,7 @@ function findExistingTasksForPlanDefinition(existingPlan, definition) {
   const directMatch = existingPlan.tasks.find((task) => task.id === definition.id);
   if (directMatch) return [directMatch];
   if (definition.sourceKey === "english") {
-    return existingPlan.tasks.filter((task) => task.category === "english" || task.category === "englishWords" || task.category === "englishReading");
+    return existingPlan.tasks.filter((task) => task.category === "english" || task.category === "englishReading");
   }
   return existingPlan.tasks.filter((task) => task.category === definition.category);
 }
@@ -198,8 +195,8 @@ function getManualPlanTaskConflicts(dateKey, sourceDay, existingPlan) {
 
 function createImportedDailyPlan(dateKey, sourceDay, existingPlan, overwriteManualDescriptions = false) {
   const tasks = IMPORTED_PLAN_TASK_DEFINITIONS.map((definition) => {
-    const sourceTask = sourceDay.tasks[definition.sourceKey];
-    const importedDescription = sourceTask.description.trim();
+    const sourceTask = sourceDay.tasks[definition.sourceKey] || {};
+    const importedDescription = String(sourceTask.description || definition.defaultDescription || "").trim();
     const existingTasks = findExistingTasksForPlanDefinition(existingPlan, definition);
     const completedTask = existingTasks.find((task) => getTaskStatus(task) === "completed");
     const manualTask = existingTasks.find((task) => taskHasManualDescription(dateKey, task));

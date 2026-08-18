@@ -143,6 +143,9 @@ test("the fixed timetable keeps vocabulary in the morning and formal English rea
   assert.match(tasksSource, /makeTask\("english-reading", "15:45—17:15"/);
   assert.match(tasksSource, /makeTask\("sunday-reading", "15:45—17:15"/);
   assert.match(tasksSource, /makeTask\(isSunday \? "sunday-english-main" : "english-main", "15:45—17:15"/);
+  assert.match(tasksSource, /const readingIndex = tasks\.findIndex\(\(task\) => task\.category === "englishReading"\)/);
+  assert.match(tasksSource, /tasks\.splice\(readingIndex, 1, englishMain\)/);
+  assert.doesNotMatch(tasksSource, /const englishIndexes = tasks[\s\S]*splice\(englishIndexes/);
   const gaps = tasksSource.slice(tasksSource.indexOf("function buildDailyExecutionGapItems"), tasksSource.indexOf("function prefillNightCloseoutTomorrow"));
   assert.match(gaps, /const englishDeadline = getPlanTaskBoundaryMinutes\(english, "end", 17 \* 60 \+ 15\)/);
   assert.match(gaps, /const task722Deadline = getPlanTaskBoundaryMinutes\(task722, "end", 10 \* 60 \+ 35\)/);
@@ -163,10 +166,10 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.match(takeover, /开始英语5分钟/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-free-focus-v144/);
+  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
   assert.match(indexSource, /js\/p0-final\.js\?v=execution-brief-v141/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
   assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=execution-brief-v141/);
 });
 
@@ -247,9 +250,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-free-focus-v144/);
+  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -435,11 +438,11 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
   assert.match(indexSource, /style\.css\?v=review-free-focus-v144/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-free-focus-v144/);
-  assert.match(serviceWorkerSource, /study-dashboard-review-free-focus-v144/);
+  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
   assert.match(serviceWorkerSource, /style\.css\?v=review-free-focus-v144/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
   assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
   assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
@@ -584,8 +587,8 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.match(tasksSource, /function returnFromFocusReview\(\)[\s\S]*复盘结果未保存[\s\S]*pendingFocusReview = null/);
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=review-free-focus-v144/);
-  assert.match(serviceWorkerSource, /study-dashboard-review-free-focus-v144/);
+  assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {

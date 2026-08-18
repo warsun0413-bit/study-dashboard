@@ -253,11 +253,11 @@ test("new plan core remains loaded before review in the current cache", () => {
   const coreIndex = indexSource.indexOf("js/ai-tomorrow-plan-core.js");
   const reviewIndex = indexSource.indexOf("js/review.js");
   assert.ok(coreIndex > 0 && reviewIndex > coreIndex);
-  assert.match(indexSource, /js\/ai-tomorrow-plan-core\.js\?v=focus-result-handoff-v140/);
-  assert.match(serviceWorkerSource, /js\/ai-tomorrow-plan-core\.js\?v=focus-result-handoff-v140/);
+  assert.match(indexSource, /js\/ai-tomorrow-plan-core\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /js\/ai-tomorrow-plan-core\.js\?v=english-split-v145/);
   assert.match(indexSource, /js\/review\.js\?v=focus-result-handoff-v140/);
   assert.match(serviceWorkerSource, /js\/review\.js\?v=focus-result-handoff-v140/);
-  assert.match(serviceWorkerSource, /study-dashboard-review-free-focus-v144/);
+  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
   assert.doesNotMatch(serviceWorkerSource, /ai-tomorrow-plan-v91|deepseek-daily-review-v90/);
 });
 

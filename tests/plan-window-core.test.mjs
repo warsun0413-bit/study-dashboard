@@ -91,6 +91,7 @@ test("7. migration keeps history and only seven current/future detailed dates", 
 
 test("7a. migration updates recognized schedule times without changing user task evidence", () => {
   const day = plain(core.createDetailedPlanFromSource("2026-07-18", sourceDay()));
+  day.tasks = day.tasks.filter((task) => task.sourceTaskKey !== "englishWords");
   const english = day.tasks.find((task) => task.sourceTaskKey === "english");
   english.time = "08:00—10:00";
   english.status = "completed";
@@ -101,7 +102,12 @@ test("7a. migration updates recognized schedule times without changing user task
 
   const migrated = plain(core.migrateDetailedPlanWindow({ "2026-07-18": day }, [], "2026-07-18")).dailyPlans["2026-07-18"];
   const migratedEnglish = migrated.tasks.find((task) => task.sourceTaskKey === "english");
+  const migratedWords = migrated.tasks.find((task) => task.sourceTaskKey === "englishWords");
   const custom = migrated.tasks.find((task) => task.id === "custom");
+  assert.equal(migratedWords.time, "08:00—08:25");
+  assert.equal(migratedWords.name, "英语单词");
+  assert.equal(migrated.tasks.filter((task) => task.sourceTaskKey === "englishWords").length, 1);
+  assert.ok(migrated.tasks.indexOf(migratedWords) < migrated.tasks.indexOf(migratedEnglish));
   assert.equal(migratedEnglish.time, "15:45—17:15");
   assert.equal(migratedEnglish.status, "completed");
   assert.equal(migratedEnglish.manualEdited, true);
@@ -149,15 +155,18 @@ test("9. import skips past and converts day eight onward to phase templates", ()
 test("10. completed, in-progress and manual-edited tasks default to local", () => {
   const plan = makePlan();
   const local = core.createDetailedPlanFromSource("2026-07-18", sourceDay("第一轮正式背诵", "-local"));
-  local.tasks[0].status = "completed";
-  local.tasks[1].status = "in-progress";
-  local.tasks[2].manualEdited = true;
-  local.tasks[2].description = "人工说明";
+  const english = local.tasks.find((task) => task.sourceTaskKey === "english");
+  const task722 = local.tasks.find((task) => task.sourceTaskKey === "722");
+  const task844 = local.tasks.find((task) => task.sourceTaskKey === "844");
+  english.status = "completed";
+  task722.status = "in-progress";
+  task844.manualEdited = true;
+  task844.description = "人工说明";
   const preview = plain(core.buildPlanImportPreview(plan, { "2026-07-18": local }, "2026-07-18"));
   assert.equal(preview.completedConflicts.length, 1);
   assert.equal(preview.inProgressConflicts.length, 1);
   assert.equal(preview.manualEditedConflicts.length, 1);
-  assert.equal(preview.result.dailyPlans["2026-07-18"].tasks[2].description, "人工说明");
+  assert.equal(preview.result.dailyPlans["2026-07-18"].tasks.find((task) => task.sourceTaskKey === "844").description, "人工说明");
 });
 
 test("11. custom tasks are preserved and never name-matched", () => {
@@ -170,9 +179,9 @@ test("11. custom tasks are preserved and never name-matched", () => {
 
 test("12. taskId has priority and sourceTaskKey is the stable fallback", () => {
   const local = core.createDetailedPlanFromSource("2026-07-18", sourceDay());
-  local.tasks[0].taskId = "different";
-  local.tasks[0].id = "different";
-  local.tasks[0].sourceTaskKey = "english";
+  const english = local.tasks.find((task) => task.sourceTaskKey === "english");
+  english.taskId = "different";
+  english.id = "different";
   const preview = plain(core.buildPlanImportPreview(makePlan(), { "2026-07-18": local }, "2026-07-18"));
   assert.ok(preview.updatedTasks.some((item) => item.importedTask.sourceTaskKey === "english"));
 });
@@ -180,12 +189,13 @@ test("12. taskId has priority and sourceTaskKey is the stable fallback", () => {
 test("13. an explicit use-import decision changes content but retains actual status", () => {
   const plan = makePlan();
   const local = core.createDetailedPlanFromSource("2026-07-18", sourceDay("第一轮正式背诵", "-old"));
-  local.tasks[0].status = "completed";
+  local.tasks.find((task) => task.sourceTaskKey === "english").status = "completed";
   const first = plain(core.buildPlanImportPreview(plan, { "2026-07-18": local }, "2026-07-18"));
   const decisions = { [first.completedConflicts[0].id]: "use-import" };
   const second = plain(core.buildPlanImportPreview(plan, { "2026-07-18": local }, "2026-07-18", decisions));
-  assert.equal(second.result.dailyPlans["2026-07-18"].tasks[0].description, "english-0");
-  assert.equal(second.result.dailyPlans["2026-07-18"].tasks[0].status, "completed");
+  const english = second.result.dailyPlans["2026-07-18"].tasks.find((task) => task.sourceTaskKey === "english");
+  assert.equal(english.description, "english-0");
+  assert.equal(english.status, "completed");
 });
 
 test("14. preview construction and cancellation path perform zero writes", () => {
@@ -221,17 +231,24 @@ test("17. detailed imported tasks carry the required stable and result fields", 
   assert.equal(task.completionCriteria, "阶段门槛达标");
   assert.equal(task.manualEdited, false);
   assert.deepEqual(task.actualResultRefs, []);
+  const words = day.tasks.find((item) => item.taskId === "plan-english-words");
+  assert.equal(words.time, "08:00—08:25");
+  assert.equal(words.name, "英语单词");
+  assert.equal(words.description.includes("[object Object]"), false);
+  assert.equal(words.resultTrackingVersion, undefined);
   const english = day.tasks.find((item) => item.taskId === "plan-english");
+  assert.equal(english.time, "15:45—17:15");
+  assert.equal(english.name, "英语阅读");
   assert.equal(english.resultTrackingVersion, 1);
   assert.deepEqual(english.subtasks.map((item) => [item.subtaskId, item.required]), [["reading", true]]);
 });
 
 test("18. an unreliable name-only candidate enters conflict instead of being overwritten", () => {
-  const localDay = { tasks: [{ id: "custom-english", name: "英语", description: "自定义", status: "not-started" }], currentTaskId: "" };
+  const localDay = { tasks: [{ id: "custom-english", name: "英语阅读", description: "自定义", status: "not-started" }], currentTaskId: "" };
   const preview = plain(core.buildPlanImportPreview(makePlan(), { "2026-07-18": localDay }, "2026-07-18"));
   assert.equal(preview.unmatchedConflicts.length, 1);
   assert.equal(preview.unmatchedConflicts[0].decision, "keep-local");
-  assert.equal(preview.result.dailyPlans["2026-07-18"].tasks[0].description, "自定义");
+  assert.equal(preview.result.dailyPlans["2026-07-18"].tasks.find((task) => task.id === "custom-english").description, "自定义");
 });
 
 test("19. P1 plan metadata is previewed and preserved without creating business records", () => {
