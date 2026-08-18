@@ -294,7 +294,7 @@ textarea { resize: vertical; }
 .due-review-row span { color: var(--muted); font-size: .82rem; }
 .review-queue-active { grid-template-columns: minmax(0, 1fr) auto; padding: 18px; border-width: 2px; }
 .review-queue-marker { width: fit-content; color: var(--primary) !important; font-weight: 750; }
-.review-start-button { justify-self: end; }
+.review-start-actions { justify-self: end; margin-top: 0; }
 .review-evidence-box { grid-column: 1 / -1; display: grid; gap: 7px; padding: 12px; border-radius: 9px; background: var(--primary-soft); }
 .review-evidence-box label { display: grid; gap: 7px; font-weight: 750; }
 .review-evidence-box textarea { min-height: 116px; background: #fff; line-height: 1.7; }
@@ -510,7 +510,8 @@ textarea { resize: vertical; }
   .professional-result-form .wide-field { grid-column: auto; }
   .due-review-row { grid-template-columns: 1fr; }
   .review-queue-active { grid-template-columns: 1fr; }
-  .review-start-button { justify-self: stretch; }
+  .review-start-actions { justify-self: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-start-actions .button { width: 100%; }
   .review-result-buttons .button { flex: 1; min-width: 82px; }
   .manual-time-note, .manual-time-actions { grid-column: auto; }
   .execution-description { grid-column: auto; }

@@ -935,6 +935,16 @@ function renderDueReviews() {
   start.className = "button primary review-start-button";
   start.textContent = "开始5分钟遮挡复述";
   start.dataset.reviewStart = review.reviewId;
+  start.dataset.reviewFocusMode = "five-minute";
+  const freeFocus = document.createElement("button");
+  freeFocus.type = "button";
+  freeFocus.className = "button secondary review-free-focus-button";
+  freeFocus.textContent = "直接自由专注";
+  freeFocus.dataset.reviewStart = review.reviewId;
+  freeFocus.dataset.reviewFocusMode = "free";
+  const startActions = document.createElement("div");
+  startActions.className = "button-row review-start-actions";
+  startActions.append(start, freeFocus);
   const evidenceBox = document.createElement("div");
   evidenceBox.className = "review-evidence-box";
   const evidenceLabel = document.createElement("label");
@@ -985,7 +995,7 @@ function renderDueReviews() {
   move.dataset.reviewReschedule = review.reviewId;
   moreControls.append(date, move);
   more.append(moreSummary, moreControls);
-  row.append(content, start, evidenceBox, controls, more);
+  row.append(content, startActions, evidenceBox, controls, more);
   container.appendChild(row);
   updateReviewEvidenceUi(evidence);
 
@@ -1074,12 +1084,18 @@ function handleDueReviewClick(event) {
   if (start) {
     const queue = normalizeReviewQueueRecords(readJson(reviewQueueKey, []));
     const review = queue.find((item) => item.reviewId === start.dataset.reviewStart);
-    if (!review || typeof startReviewFiveMinuteRound !== "function") {
+    const directFree = start.dataset.reviewFocusMode === "free";
+    const startReview = directFree
+      ? (typeof startReviewFreeFocusRound === "function" ? startReviewFreeFocusRound : null)
+      : (typeof startReviewFiveMinuteRound === "function" ? startReviewFiveMinuteRound : null);
+    if (!review || !startReview) {
       return setStatus("#dueReviewsStatus", "当前无法启动复盘专注，请刷新页面后重试。", true);
     }
-    const started = startReviewFiveMinuteRound(review);
+    const started = startReview(review);
     if (!started) return;
-    setStatus("#dueReviewsStatus", "已启动5分钟遮挡复述；结束后回来填写三行闭卷证据。");
+    setStatus("#dueReviewsStatus", directFree
+      ? "已启动复盘自由专注；结束后填写三行闭卷证据。"
+      : "已启动5分钟遮挡复述；结束后回来填写三行闭卷证据。");
     return;
   }
   if (complete) {

@@ -2751,6 +2751,14 @@ function startCurrentReviewFromExecution(expectedReviewId) {
 }
 
 function startReviewFiveMinuteRound(review) {
+  return startReviewFocusRound(review);
+}
+
+function startReviewFreeFocusRound(review) {
+  return startReviewFocusRound(review, { directFree: true });
+}
+
+function startReviewFocusRound(review, options = {}) {
   const hasPendingRound = focusTimerState.running || currentFocusSeconds > 0 || focusRoundStartedAt;
   if (hasPendingRound) {
     setStatus("#dueReviewsStatus", "已有未结束的专注轮，请先继续或结束当前专注，避免重复计时。", true);
@@ -2777,7 +2785,8 @@ function startReviewFiveMinuteRound(review) {
   };
   focusReviewNextReviewId = "";
   setCurrentTask(task.id);
-  prepareFiveMinuteStartup(task);
+  if (options.directFree === true) setFocusTimingMode(FREE_FOCUS_MODE);
+  else prepareFiveMinuteStartup(task);
   syncFocusRoundGoal(`遮挡复述：${state.active.knowledgeUnit || state.active.task || "当前复盘"}`);
   startPomodoro();
   if (pomodoroTimerId) enterFocusMode();
