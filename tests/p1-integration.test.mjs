@@ -139,47 +139,39 @@ test("daily review budget enters the gap only after its own time block", () => {
   assert.equal(api.getCurrentDailyExecutionGap([{ ...items[0], complete: true }], { nowMinutes: 21 * 60 }), null);
 });
 
-test("English anchor stops overdue catch-up before its preparation window and owns the active block", () => {
+test("scheduled task anchors keep the cockpit on 844 before and during its time block", () => {
   const items = [
-    {
-      key: "english", taskId: "english", complete: false, priority: 10,
-      deadlineMinutes: 17 * 60 + 15, startMinutes: 15 * 60 + 45, endMinutes: 17 * 60 + 15,
-      isProtectedAnchor: true, transitionMinutes: 15, minimumBlockMinutes: 5,
-    },
     { key: "722", taskId: "722", complete: false, priority: 20, deadlineMinutes: 10 * 60 + 35, minimumBlockMinutes: 5 },
     { key: "844", taskId: "844", complete: false, priority: 30, deadlineMinutes: 12 * 60 + 20, minimumBlockMinutes: 5 },
   ];
-  const beforeBoundary = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 25 }));
-  assert.equal(beforeBoundary.key, "722");
-  assert.equal(beforeBoundary.anchorState, undefined);
-  const noRoom = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 26 }));
-  assert.equal(noRoom.key, "english");
+  const anchors = [
+    { key: "722", taskId: "722", label: "722", complete: false, startMinutes: 8 * 60 + 35, endMinutes: 10 * 60 + 35, transitionMinutes: 15 },
+    { key: "844", taskId: "844", label: "844", complete: false, startMinutes: 10 * 60 + 50, endMinutes: 12 * 60 + 20, transitionMinutes: 15 },
+  ];
+  const noRoom = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 10 * 60 + 31, anchors: [anchors[1]], minimumBlockMinutes: 5 }));
+  assert.equal(noRoom.key, "844");
   assert.equal(noRoom.anchorState, "upcoming");
   assert.equal(noRoom.availableMinutes, 4);
-  const prepare = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 30 }));
-  assert.equal(prepare.key, "english");
+  const prepare = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 10 * 60 + 41, anchors }));
+  assert.equal(prepare.key, "844");
   assert.equal(prepare.anchorState, "prepare");
-  const active = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 45 }));
-  assert.equal(active.key, "english");
+  const active = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 10 * 60 + 50, anchors }));
+  assert.equal(active.key, "844");
   assert.equal(active.anchorState, "active");
-  const overdue = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 17 * 60 + 15 }));
-  assert.equal(overdue.key, "english");
+  const overdue = plain(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 12 * 60 + 20, anchors }));
+  assert.equal(overdue.key, "722");
   assert.equal(overdue.anchorState, undefined);
 });
 
-test("completed or blocked English anchor never mutates or overrides the remaining execution facts", () => {
+test("completed, blocked, or inspected schedule anchors never mutate execution facts", () => {
   const items = [
-    {
-      key: "english", taskId: "english", complete: true, priority: 10,
-      deadlineMinutes: 17 * 60 + 15, startMinutes: 15 * 60 + 45, endMinutes: 17 * 60 + 15,
-      isProtectedAnchor: true, transitionMinutes: 15,
-    },
     { key: "722", taskId: "722", complete: false, priority: 20, deadlineMinutes: 10 * 60 + 35, minimumBlockMinutes: 5 },
   ];
-  const before = JSON.stringify(items);
-  assert.equal(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 45 }).key, "722");
-  assert.equal(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 15 * 60 + 45, blocked: true }), null);
-  assert.equal(JSON.stringify(items), before);
+  const anchors = [{ key: "844", taskId: "844", complete: true, startMinutes: 10 * 60 + 50, endMinutes: 12 * 60 + 20, transitionMinutes: 15 }];
+  const before = JSON.stringify({ items, anchors });
+  assert.equal(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 10 * 60 + 50, anchors }).key, "722");
+  assert.equal(api.getAnchorAwareDailyExecutionGap(items, { nowMinutes: 10 * 60 + 50, anchors, blocked: true }), null);
+  assert.equal(JSON.stringify({ items, anchors }), before);
 });
 
 test("night stop keeps at most one professional product and one English-or-politics support task", () => {

@@ -2132,6 +2132,32 @@ function getDailyExecutionGapTomorrowAction(task, fallback) {
   return exactAction || fallback;
 }
 
+function buildDailyExecutionScheduleAnchors(plan = getTodayPlan()) {
+  const tasks = Array.isArray(plan && plan.tasks) ? plan.tasks : [];
+  return tasks
+    .filter((task) => task && (typeof isExecutablePlanTask === "function"
+      ? isExecutablePlanTask(task)
+      : !["completed", "skipped", "cancelled"].includes(getTaskStatus(task))))
+    .map((task) => {
+      const startMinutes = getPlanTaskBoundaryMinutes(task, "start", Number.NaN);
+      const endMinutes = getPlanTaskBoundaryMinutes(task, "end", Number.NaN);
+      if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) return null;
+      return {
+        key: String(task.sourceTaskKey || task.category || task.id),
+        taskId: task.id,
+        label: task.name || "下一项任务",
+        complete: false,
+        isProtectedAnchor: true,
+        startMinutes,
+        endMinutes,
+        transitionMinutes: 15,
+        minimumBlockMinutes: 5,
+        anchorDescription: `按计划进入${task.name || "下一项任务"}时间块；先完成本时间块的明确起点，之前的欠账在本时间块结束后继续处理。`,
+      };
+    })
+    .filter(Boolean);
+}
+
 function buildDailyExecutionGapItems(plan = getTodayPlan()) {
   const tasks = Array.isArray(plan && plan.tasks) ? plan.tasks : [];
   const findTask = (predicate) => tasks.find((task) => task && predicate(task)) || null;
@@ -2141,7 +2167,6 @@ function buildDailyExecutionGapItems(plan = getTodayPlan()) {
   const rollingReview = findTask((task) => task.category === "rollingReview");
   const politics = findTask((task) => task.category === "politics" || task.sourceTaskKey === "politics");
   const output = findTask((task) => task.category === "output" || task.sourceTaskKey === "outputOrMock");
-  const englishStart = getPlanTaskBoundaryMinutes(english, "start", 15 * 60 + 45);
   const englishDeadline = getPlanTaskBoundaryMinutes(english, "end", 17 * 60 + 15);
   const task722Deadline = getPlanTaskBoundaryMinutes(task722, "end", 10 * 60 + 35);
   const task844Deadline = getPlanTaskBoundaryMinutes(task844, "end", 12 * 60 + 20);
@@ -2158,12 +2183,10 @@ function buildDailyExecutionGapItems(plan = getTodayPlan()) {
     english && {
       key: "english", taskId: english.id, priority: 10, deadlineMinutes: englishDeadline,
       status: getTaskStatus(english),
-      isProtectedAnchor: true, startMinutes: englishStart, endMinutes: englishDeadline,
-      transitionMinutes: 15, minimumBlockMinutes: 5,
+      minimumBlockMinutes: 5,
       label: "英语阅读", complete: typeof validateP1EnglishTaskCompletion === "function" && validateP1EnglishTaskCompletion(english).valid,
       startAction: getDailyExecutionGapStartAction(english),
       description: "下午英语阅读时间块已经结束，但正式结果尚未保存；先补真实做题与依据定位。",
-      anchorDescription: "保护下午英语阅读锚点：完成真题阅读、逐题证据定位并保存真实结果；上午欠账在本时间块结束后继续处理。",
       tomorrowAction: getDailyExecutionGapTomorrowAction(english, "先完成英语阅读真题并保存真实结果"),
     },
     task722 && {
@@ -2259,6 +2282,7 @@ function getDailyExecutionTakeover(plan = getTodayPlan(), options = {}) {
   const now = new Date();
   const schedule = getNightExecutionSchedule(plan, now);
   const items = buildDailyExecutionGapItems(plan);
+  const anchors = buildDailyExecutionScheduleAnchors(plan);
   const englishItem = items.find((item) => item.key === "english");
   const englishTask = englishItem && plan.tasks.find((task) => task.id === englishItem.taskId);
   const englishRecord = englishTask && typeof getP1EnglishState === "function"
@@ -2281,6 +2305,7 @@ function getDailyExecutionTakeover(plan = getTodayPlan(), options = {}) {
     nowMinutes: schedule.nowMinutes,
     blocked: options.blocked === true || selectedProtectedBlock,
     minimumBlockMinutes: 5,
+    anchors,
   });
   if (!gap) return null;
   const task = plan.tasks.find((item) => item.id === gap.taskId);
@@ -2296,13 +2321,13 @@ function getExecutionGapSurfaceView(takeover) {
   const anchorState = String(gap.anchorState || "");
   const anchorProtected = ["upcoming", "prepare", "active"].includes(anchorState);
   const anchorMeta = anchorState === "active"
-    ? `锚点进行中 · ${task.time || "15:45—17:15"}`
+    ? `时间块进行中 · ${task.time || "计划时间待定"}`
     : anchorState === "prepare"
-      ? `锚点准备 · ${task.time || "15:45—17:15"}`
-      : `切换保护 · 距锚点不足${Math.max(1, Number(gap.availableMinutes) || 1)}分钟`;
+      ? `时间块准备 · ${task.time || "计划时间待定"}`
+      : `切换保护 · 距下一时间块不足${Math.max(1, Number(gap.availableMinutes) || 1)}分钟`;
   const anchorTitle = anchorState === "active" ? `现在做：${gap.label}` : `准备：${gap.label}`;
   const anchorDescription = anchorState === "upcoming"
-    ? `距离英语阅读准备窗口已不足一个5分钟最小块，不再开启新的上午欠账。${startAction}`
+    ? `距离${gap.label}准备窗口已不足一个5分钟最小块，不再开启上一时间块的欠账。${startAction}`
     : `${gap.anchorDescription || gap.description}${startAction}`;
   return createExecutionSurfaceView({
     mode: EXECUTION_SURFACE_MODES.EXECUTION_GAP,
@@ -2321,7 +2346,7 @@ function getExecutionGapSurfaceView(takeover) {
       : `${gap.description}${startAction}`,
     primary: {
       label: config.action === "unified-start"
-        ? anchorProtected ? "开始英语5分钟" : "先补5分钟"
+        ? anchorProtected ? `开始${gap.label} 5分钟` : "先补5分钟"
         : config.action === "unified-review" ? config.label : "补齐正式结果",
       action: "execution-gap-action",
       delegateAction: config.action,

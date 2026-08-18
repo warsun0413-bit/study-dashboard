@@ -154,22 +154,27 @@ test("the fixed timetable keeps vocabulary in the morning and formal English rea
   assert.doesNotMatch(gaps, /middayDeadline|上午时间块已经结束，但英语阅读/);
 });
 
-test("the English reading anchor protects its preparation and exam-practice window without stored replanning", () => {
-  const gaps = tasksSource.slice(tasksSource.indexOf("function buildDailyExecutionGapItems"), tasksSource.indexOf("function prefillNightCloseoutTomorrow"));
+test("all executable schedule blocks protect their transitions without stored replanning", () => {
+  const anchors = tasksSource.slice(tasksSource.indexOf("function buildDailyExecutionScheduleAnchors"), tasksSource.indexOf("function buildDailyExecutionGapItems"));
   const takeover = tasksSource.slice(tasksSource.indexOf("function getDailyExecutionTakeover"), tasksSource.indexOf("function resetExecutionSurfaceLayers"));
-  assert.match(gaps, /isProtectedAnchor: true/);
-  assert.match(gaps, /transitionMinutes: 15, minimumBlockMinutes: 5/);
-  assert.match(gaps, /anchorDescription: "保护下午英语阅读锚点/);
+  assert.match(anchors, /isExecutablePlanTask\(task\)/);
+  assert.match(anchors, /isProtectedAnchor: true/);
+  assert.match(anchors, /transitionMinutes: 15/);
+  assert.match(anchors, /minimumBlockMinutes: 5/);
+  assert.match(anchors, /之前的欠账在本时间块结束后继续处理/);
   assert.match(takeover, /getAnchorAwareDailyExecutionGap/);
-  assert.match(takeover, /锚点准备/);
-  assert.match(takeover, /锚点进行中/);
-  assert.match(takeover, /开始英语5分钟/);
+  assert.match(takeover, /buildDailyExecutionScheduleAnchors\(plan\)/);
+  assert.match(takeover, /anchors,/);
+  assert.match(takeover, /时间块准备/);
+  assert.match(takeover, /时间块进行中/);
+  assert.match(takeover, /开始\$\{gap\.label\} 5分钟/);
+  assert.doesNotMatch(takeover, /距离英语阅读准备窗口/);
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
-  assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(indexSource, /js\/p1-integration-core\.js\?v=schedule-transition-v149/);
+  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
   assert.match(indexSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
-  assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
   assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=next-task-reveal-v147/);
 });
 
@@ -250,9 +255,9 @@ test("returning from an interrupted focus round offers one-click recovery", () =
   assert.match(tasksSource, /reason === "pagehide" && focusTimerContinuedWhileHidden/);
   assert.match(tasksSource, /window\.addEventListener\("pagehide", \(\) => pauseFocusForPageExit\("pagehide"\)\)/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
   assert.match(serviceWorkerSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
   assert.match(indexSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(serviceWorkerSource, /js\/p0-results\.js\?v=review-free-focus-v144/);
   assert.match(styleSource, /\.focus-recovery-card\[hidden\] \{ display: none; \}/);
@@ -448,11 +453,11 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /id="focusResultHandoffBrief"/);
   assert.match(indexSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
-  assert.match(serviceWorkerSource, /study-dashboard-next-task-reveal-v147/);
+  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /study-dashboard-schedule-transition-v149/);
   assert.match(serviceWorkerSource, /style\.css\?v=next-task-reveal-v147/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
-  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
+  assert.match(serviceWorkerSource, /js\/tasks\.js\?v=schedule-transition-v149/);
   assert.match(tasksSource, /#cockpitExecutionBrief"\), displayedTask \? getTaskExecutionBrief\(displayedTask\) : null/);
   assert.match(tasksSource, /#focusModeExecutionBrief"\), task \? getTaskExecutionBrief\(task\) : null/);
   assert.match(tasksSource, /#focusResultHandoffBrief"\),[\s\S]*model\.task \? getTaskExecutionBrief\(model\.task\) : null/);
@@ -597,8 +602,8 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.match(tasksSource, /function returnFromFocusReview\(\)[\s\S]*复盘结果未保存[\s\S]*pendingFocusReview = null/);
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
-  assert.match(indexSource, /js\/tasks\.js\?v=next-task-reveal-v147/);
-  assert.match(serviceWorkerSource, /study-dashboard-next-task-reveal-v147/);
+  assert.match(indexSource, /js\/tasks\.js\?v=schedule-transition-v149/);
+  assert.match(serviceWorkerSource, /study-dashboard-schedule-transition-v149/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {

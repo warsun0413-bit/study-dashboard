@@ -53,10 +53,15 @@ function getAnchorAwareDailyExecutionGap(items, options = {}) {
   if (options.blocked) return null;
   const nowMinutes = Number(options.nowMinutes);
   const records = p1FinalArray(items).filter((item) => item && item.taskId && item.complete !== true);
-  const anchors = records
-    .filter((item) => item.isProtectedAnchor === true
+  const anchorsByTaskId = new Map();
+  [...records.filter((item) => item.isProtectedAnchor === true), ...p1FinalArray(options.anchors)]
+    .filter((item) => item
+      && item.taskId
+      && item.complete !== true
       && Number.isFinite(Number(item.startMinutes))
       && Number.isFinite(Number(item.endMinutes)))
+    .forEach((item) => anchorsByTaskId.set(String(item.taskId), item));
+  const anchors = [...anchorsByTaskId.values()]
     .sort((left, right) => Number(left.startMinutes) - Number(right.startMinutes));
   const activeAnchor = anchors.find((item) => {
     const transitionMinutes = Math.max(0, Number(item.transitionMinutes) || 0);
