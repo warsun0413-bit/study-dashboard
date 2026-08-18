@@ -167,10 +167,10 @@ test("the English reading anchor protects its preparation and exam-practice wind
   assert.doesNotMatch(takeover, /writeJson|localStorage\.setItem|setTaskStatus|saveTodayPlan/);
   assert.match(indexSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
   assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(indexSource, /js\/p0-final\.js\?v=execution-brief-v141/);
+  assert.match(indexSource, /js\/p0-final\.js\?v=next-task-order-v146/);
   assert.match(serviceWorkerSource, /js\/p1-integration-core\.js\?v=anchor-aware-v127/);
   assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=execution-brief-v141/);
+  assert.match(serviceWorkerSource, /js\/p0-final\.js\?v=next-task-order-v146/);
 });
 
 test("all takeover builders return views instead of writing cockpit fields", () => {
@@ -439,7 +439,7 @@ test("one read-only execution brief supplies the cockpit timetable focus and res
   assert.match(indexSource, /style\.css\?v=review-free-focus-v144/);
   assert.match(indexSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
   assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
+  assert.match(serviceWorkerSource, /study-dashboard-next-task-order-v146/);
   assert.match(serviceWorkerSource, /style\.css\?v=review-free-focus-v144/);
   assert.match(serviceWorkerSource, /js\/execution-state-core\.js\?v=review-focus-loop-v142/);
   assert.match(serviceWorkerSource, /js\/tasks\.js\?v=english-split-v145/);
@@ -588,7 +588,7 @@ test("review focus identity and unresolved evidence survive a safe page recovery
   assert.doesNotMatch(tasksSource, /const focusReview(?:Context|Recovery|Pending)[A-Za-z]*Key/);
   assert.match(indexSource, /js\/focus-timer-core\.js\?v=review-recovery-v143/);
   assert.match(indexSource, /js\/tasks\.js\?v=english-split-v145/);
-  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
+  assert.match(serviceWorkerSource, /study-dashboard-next-task-order-v146/);
 });
 
 test("cockpit exposes only execution facts while retaining detailed controls", () => {
@@ -601,6 +601,9 @@ test("cockpit exposes only execution facts while retaining detailed controls", (
   assert.doesNotMatch(tasksSource, /renderReviewPriorityCockpit|priority-review-start|review-priority-mode/);
   assert.match(indexSource, /id="topPriorityList"/);
   assert.match(indexSource, /下一项学习任务/);
+  assert.match(source, /const upcomingTask = typeof findNextScheduledPlanTask === "function"[\s\S]*findNextScheduledPlanTask\(plan\?\.tasks, nowMinutes, selectedTaskId\)/);
+  assert.match(source, /const guidance = !upcomingTask && typeof buildDailyExecutionGapItems === "function"/);
+  assert.match(source, /const priorities = upcomingTask \? \[\{[\s\S]*targetId: upcomingTask\.id \|\| upcomingTask\.taskId[\s\S]*\}\] : guidance \? \[\{/);
   assert.match(source, /selectDailyGuidanceItem\(buildDailyExecutionGapItems\(plan \|\| \{ tasks: \[\] \}\), \{/);
   assert.match(source, /actionField: "startAction"[\s\S]*excludeTaskId: selectedTaskId[\s\S]*excludeKeys: \["review"\]/);
   assert.match(source, /link\.href = "#planTitle"/);

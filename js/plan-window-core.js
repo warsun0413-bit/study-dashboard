@@ -55,11 +55,13 @@ function findNextExecutablePlanTask(tasks, currentTaskId, currentMinutes) {
   return findPlanTaskForMinutes(executable, currentMinutes);
 }
 
-function findNextScheduledPlanTask(tasks, currentMinutes) {
+function findNextScheduledPlanTask(tasks, currentMinutes, excludedTaskId = "") {
   const minute = Number(currentMinutes);
   if (!Number.isInteger(minute) || minute < 0 || minute >= 1440) return null;
+  const excludedId = String(excludedTaskId || "");
   const upcoming = (Array.isArray(tasks) ? tasks : [])
     .filter(isExecutablePlanTask)
+    .filter((task) => !excludedId || String(task && (task.id || task.taskId) || "") !== excludedId)
     .map((task) => ({ task, range: getPlanTaskTimeRange(task) }))
     .filter((item) => item.range && item.range.start > minute)
     .sort((left, right) => left.range.start - right.range.start);

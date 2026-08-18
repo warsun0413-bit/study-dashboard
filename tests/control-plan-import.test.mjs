@@ -79,16 +79,16 @@ test("the August 12 acceptance day remains recoverable as an exact phase templat
 test("built-in import is visible, wired through preview, and cached", () => {
   assert.match(indexSource, /id="importControlPlanBtn"/);
   assert.match(indexSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
-  assert.match(indexSource, /plan-window-core\.js\?v=english-split-v145/);
+  assert.match(indexSource, /plan-window-core\.js\?v=next-task-order-v146/);
   assert.match(indexSource, /data-safety\.js\?v=admission-joint-v114/);
   assert.match(indexSource, /app\.js\?v=admission-joint-v114/);
   assert.match(appSource, /importControlPlanBtn[\s\S]*importBuiltInNankaiControlPlan/);
   assert.match(safetySource, /importNankaiPlan\(NANKAI_CONTROL_PLAN_20260806\)/);
   assert.match(safetySource, /\n\s+detailedPlanDates,/);
   assert.match(safetySource, /typeof renderAiTomorrowPlanPreview === "function"/);
-  assert.match(serviceWorkerSource, /study-dashboard-english-split-v145/);
+  assert.match(serviceWorkerSource, /study-dashboard-next-task-order-v146/);
   assert.match(serviceWorkerSource, /data-safety\.js\?v=admission-joint-v114/);
   assert.match(serviceWorkerSource, /nankai-control-plan-2026-08-06\.js\?v=control-plan-import-v105/);
-  assert.match(serviceWorkerSource, /plan-window-core\.js\?v=english-split-v145/);
+  assert.match(serviceWorkerSource, /plan-window-core\.js\?v=next-task-order-v146/);
   assert.match(serviceWorkerSource, /tasks\.js\?v=english-split-v145/);
 });

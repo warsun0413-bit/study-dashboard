@@ -363,6 +363,7 @@ test("26. cockpit keeps an active task but never promotes an off-window task", (
   ];
   assert.equal(core.findNextExecutablePlanTask(tasks, "844", 10 * 60 + 30).id, "844");
   assert.equal(core.findNextExecutablePlanTask(tasks, "", 10 * 60 + 30).id, "722");
+  assert.equal(core.findNextScheduledPlanTask(tasks, 10 * 60 + 30, "722").id, "844");
   tasks[2].status = "completed";
   tasks[2].completed = true;
   assert.equal(core.findNextExecutablePlanTask(tasks, "722", 14 * 60 + 30).id, "844");
@@ -372,6 +373,7 @@ test("26. cockpit keeps an active task but never promotes an off-window task", (
   assert.equal(core.findNextScheduledPlanTask(tasks, 16 * 60 + 30).id, "exercise");
   assert.equal(core.findNextExecutablePlanTask(tasks, "", 13 * 60), null);
   assert.equal(core.findNextScheduledPlanTask(tasks, 13 * 60).id, "exercise");
+  assert.equal(core.findNextScheduledPlanTask(tasks, 13 * 60, "exercise"), null);
 });
 
 test("27. safeguard keeps one professional task and advances only on formal completion", () => {

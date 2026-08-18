@@ -35,7 +35,12 @@ function renderP0Priorities() {
   const date = getDateKey();
   const plan = readDailyPlans()[date];
   const selectedTaskId = document.querySelector("#focusTask")?.value || plan?.currentTaskId || "";
-  const guidance = typeof buildDailyExecutionGapItems === "function" && typeof selectDailyGuidanceItem === "function"
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const upcomingTask = typeof findNextScheduledPlanTask === "function"
+    ? findNextScheduledPlanTask(plan?.tasks, nowMinutes, selectedTaskId)
+    : null;
+  const guidance = !upcomingTask && typeof buildDailyExecutionGapItems === "function" && typeof selectDailyGuidanceItem === "function"
     ? selectDailyGuidanceItem(buildDailyExecutionGapItems(plan || { tasks: [] }), {
       actionField: "startAction",
       excludeTaskId: selectedTaskId,
@@ -45,7 +50,12 @@ function renderP0Priorities() {
   const guidanceTask = guidance && Array.isArray(plan?.tasks)
     ? plan.tasks.find((task) => String(task && task.id || "") === guidance.taskId)
     : null;
-  const priorities = guidance ? [{
+  const priorities = upcomingTask ? [{
+    type: "task",
+    targetId: upcomingTask.id || upcomingTask.taskId,
+    title: upcomingTask.name || "下一项任务",
+    meta: upcomingTask.time || "",
+  }] : guidance ? [{
     type: "task",
     targetId: guidance.taskId,
     title: guidance.label || guidanceTask?.name || "下一项任务",
